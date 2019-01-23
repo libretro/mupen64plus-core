@@ -80,6 +80,7 @@
 #endif
 
 #include "../../../libretro/libretro_memory.h"
+#include "../../../custom/GLideN64/GLideN64_libretro.h"
 
 #ifdef DBG
 #include "debugger/dbg_debugger.h"
@@ -995,9 +996,9 @@ m64p_error main_run(void)
     const struct video_capture_backend_interface* igbcam_backend;
 
     /* XXX: select type of flashram from db */
-    uint32_t flashram_type = MX29L1100_ID
-    
-    count_per_op = ROM_PARAMS.countperop;
+    uint32_t flashram_type = MX29L1100_ID;
+
+    count_per_op = CountPerOp;
     disable_extra_mem = ROM_PARAMS.disableextramem;
 
     rdram_size = (disable_extra_mem == 0) ? 0x800000 : 0x400000;
