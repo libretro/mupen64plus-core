@@ -33,6 +33,7 @@
 #include <string.h>
 #include <api/m64p_plugin.h>
 #include <api/callbacks.h>
+#include <mupen64plus-next_common.h>
 
 /* XXX: this is an abuse of the Zilmar Spec normally this value is reserved */
 enum {
@@ -90,7 +91,6 @@ static m64p_error input_plugin_get_input(void* opaque, uint32_t* input_)
         return M64ERR_SYSTEM_FAIL;
     }
 
-
     /* has Controls[i].Plugin changed since last call */
     if (cin_compat->last_pak_type != Controls[cin_compat->control_id].Plugin) {
         pak_change_requested = 1;
@@ -114,18 +114,25 @@ static m64p_error input_plugin_get_input(void* opaque, uint32_t* input_)
     if (cin_compat->pak_switch_delay > 0 && --cin_compat->pak_switch_delay == 0) {
         cin_compat->main_switch_pak(cin_compat->control_id);
         cin_compat->main_switch_pak = NULL;
+        // If switching to Transfer Pak and if a rom path is set, Switch it
+        if(Controls[cin_compat->control_id].Plugin == PLUGIN_TRANSFER_PAK && retro_transferpak_rom_path)
+        {
+            cin_compat->gb_cart_switch_enabled = 1;
+        }
     }
 
     if (cin_compat->gb_cart_switch_enabled) {
-        /* disconnect current GB cart (if any) immediately after "GB cart switch" button is released */
-        if (is_button_released(keys.Value, cin_compat->last_input, GB_CART_SWITCH_BUTTON)) {
+        // disconnect current GB cart (if any) immediately after "GB cart switch" button is released
+        if (!cin_compat->gb_switch_delay) {
             change_gb_cart(cin_compat->tpk, NULL);
             cin_compat->gb_switch_delay = GB_CART_SWITCH_DELAY;
         }
 
-        /* switch to new GB cart after switch delay has expired */
+        // switch to new GB cart after switch delay has expired
         if (cin_compat->gb_switch_delay > 0 && --cin_compat->gb_switch_delay == 0) {
             main_change_gb_cart(cin_compat->control_id);
+            cin_compat->gb_cart_switch_enabled = 0;
+            cin_compat->gb_switch_delay = 0;
         }
     }
 

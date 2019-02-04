@@ -24,6 +24,7 @@
 #include <string.h>
 #include <sys/types.h> // needed for u_int, u_char, etc
 #include <assert.h>
+#include <sys/types.h>
 
 #if defined(WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -55,7 +56,11 @@
 #include "device/rcp/rsp/rsp_core.h"
 
 #if !defined(WIN32)
+#ifndef HAVE_LIBNX
 #include <sys/mman.h>
+#else
+#include "../../../../../switch/mman.h"
+#endif // HAVE_LIBNX
 #endif
 
 #if defined(RECOMPILER_DEBUG) && !defined(RECOMP_DBG)
@@ -149,6 +154,8 @@ static void ensure_dynarec_cache_alignment(void)
     #define assem_debug(...) DebugMessage(M64MSG_VERBOSE, __VA_ARGS__)
 #else
     #define assem_debug(...)
+    // Cleanup debug copies
+    #define strcpy(...)
 #endif
 #if INV_DEBUG
     #define inv_debug(...) DebugMessage(M64MSG_VERBOSE, __VA_ARGS__)
@@ -2520,7 +2527,7 @@ static void ll_kill_pointers(struct ll_entry *head,intptr_t addr,int shift)
     {
       inv_debug("EXP: Kill pointer at %x (%x)\n",(intptr_t)head->addr,head->vaddr);
       uintptr_t host_addr=(intptr_t)kill_pointer(head->addr);
-      #if NEW_DYNAREC >= NEW_DYNAREC_ARM
+      #if NEW_DYNAREC == NEW_DYNAREC_ARM
         needs_clear_cache[(host_addr-(uintptr_t)base_addr)>>17]|=1<<(((host_addr-(uintptr_t)base_addr)>>12)&31);
       #else
         /* avoid unused variable warning */
@@ -2861,7 +2868,7 @@ static void invalidate_page(u_int page)
   while(head!=NULL) {
     inv_debug("INVALIDATE: kill pointer to %x (%x)\n",head->vaddr,(intptr_t)head->addr);
       uintptr_t host_addr=(intptr_t)kill_pointer(head->addr);
-    #if NEW_DYNAREC >= NEW_DYNAREC_ARM
+    #if NEW_DYNAREC == NEW_DYNAREC_ARM
       needs_clear_cache[(host_addr-(uintptr_t)base_addr)>>17]|=1<<(((host_addr-(uintptr_t)base_addr)>>12)&31);
     #else
       /* avoid unused variable warning */
@@ -8696,6 +8703,9 @@ static void pagespan_ds(void)
 }
 
 /**** Recompiler ****/
+#ifdef HAVE_LIBNX
+ALIGN(4096, char jit_memory[33554432]) __attribute__((section(".text")));
+#endif
 void new_dynarec_init(void)
 {
   DebugMessage(M64MSG_INFO, "Init new dynarec");
@@ -8713,9 +8723,17 @@ void new_dynarec_init(void)
 #define DOUBLE_CACHE_ADDR 3   // Put the dynarec cache at random address with RW address != RX address
 
 // Default to fixed cache address
+#ifdef HAVE_LIBNX
+#define CACHE_ADDR DOUBLE_CACHE_ADDR
+#else
 #define CACHE_ADDR FIXED_CACHE_ADDR
+#endif
 
 #if CACHE_ADDR==DOUBLE_CACHE_ADDR
+#ifdef HAVE_LIBNX
+  base_addr = mmap((u_char *)jit_memory, 1<<TARGET_SIZE_2, 0,0,0,0);
+  base_addr_rx = (void*)jit_memory;
+#else
   #include <unistd.h>
   #include <sys/types.h>
   #include <fcntl.h>
@@ -8736,6 +8754,7 @@ void new_dynarec_init(void)
 
   assert(base_addr_rx!=(void*)-1);
   close(fd);
+#endif // HAVE_LIBNX
 #elif CACHE_ADDR==FIXED_CACHE_ADDR
   mprotect ((u_char *)g_dev.r4300.extra_memory, 1<<TARGET_SIZE_2,
             PROT_READ | PROT_WRITE | PROT_EXEC);
@@ -8791,7 +8810,11 @@ void new_dynarec_init(void)
   // Copy this into local area so we don't have to put it in every literal pool
   g_dev.r4300.new_dynarec_hot_state.invc_ptr=g_dev.r4300.cached_interp.invalid_code;
 #endif
+#ifdef HAVE_LIBNX
   stop_after_jal=0;
+#else
+  stop_after_jal=1;
+#endif
   // TLB
   using_tlb=0;
   for(n=0;n<524288;n++) // 0 .. 0x7FFFFFFF
