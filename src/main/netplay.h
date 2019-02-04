@@ -93,7 +93,7 @@ static osal_inline int netplay_get_controller(uint8_t player)
 
 static osal_inline file_status_t netplay_read_storage(const char *filename, void *data, size_t size)
 {
-    return 0;
+    return file_open_error;
 }
 
 static osal_inline void netplay_sync_settings(uint32_t *count_per_op, uint32_t *count_per_op_denom_pot, uint32_t *disable_extra_mem, int32_t *si_dma_duration, uint32_t *emumode, int32_t *no_compiled_jump)

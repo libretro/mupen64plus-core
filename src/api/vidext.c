@@ -23,15 +23,6 @@
  * outside of the core library.
  */
 
-#include <SDL.h>
-/* we need at least SDL 2.0.6 for vulkan */
-#if !SDL_VERSION_ATLEAST(2,0,6)
-    #undef VIDEXT_VULKAN
-#endif
-#ifdef VIDEXT_VULKAN
-#include <SDL_vulkan.h>
-#include <vulkan/vulkan.h>
-#endif
 #include <stdlib.h>
 #include <string.h>
 

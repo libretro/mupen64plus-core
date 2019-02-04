@@ -20,13 +20,9 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.          *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#include <SDL.h>
-#include <SDL_syswm.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-SDL_JoystickID l_iJoyInstanceID[10];
 
 #define M64P_CORE_PROTOTYPES 1
 #include "api/callbacks.h"
