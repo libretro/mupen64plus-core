@@ -26,6 +26,11 @@
 #include "api/m64p_common.h"
 #include "api/m64p_plugin.h"
 #include "api/m64p_types.h"
+#include "mupen64plus-next_common.h"
+
+extern GFX_INFO gfx_info;
+
+extern CONTROL Controls[4];
 
 extern m64p_error plugin_connect(m64p_plugin_type, m64p_dynlib_handle plugin_handle);
 extern m64p_error plugin_start(m64p_plugin_type);
