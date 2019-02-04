@@ -23,9 +23,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/types.h>
 
 #if defined(__APPLE__)
-#include <sys/types.h> // needed for u_int, u_char, etc
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
@@ -45,7 +45,11 @@
 #include "device/rcp/rsp/rsp_core.h"
 
 #if !defined(WIN32)
+#ifndef HAVE_LIBNX
 #include <sys/mman.h>
+#else
+#include "../../../../../switch/mman.h"
+#endif // HAVE_LIBNX
 #endif
 
 #if defined(RECOMPILER_DEBUG) && !defined(RECOMP_DBG)
@@ -89,6 +93,8 @@ void recomp_dbg_block(int addr);
     #define assem_debug(...) DebugMessage(M64MSG_VERBOSE, __VA_ARGS__)
 #else
     #define assem_debug(...)
+    // Cleanup debug copies
+    #define strcpy(...)
 #endif
 #if INV_DEBUG
     #define inv_debug(...) DebugMessage(M64MSG_VERBOSE, __VA_ARGS__)
@@ -2338,7 +2344,9 @@ static void tlb_speed_hacks()
 u_int verify_dirty(struct ll_entry * head)
 {
   void *source;
-  if((int)head->start>=0xa4000000&&(int)head->start<0xa4001000) {
+  if((int)head->start>=0xA0000000&&(int)head->start<0xA07FFFFF) {
+    source=(void *)((uintptr_t)g_dev.rdram.dram+head->start-0xA0000000);
+  }else if((int)head->start>=0xa4000000&&(int)head->start<0xa4001000) {
     source=(void *)((uintptr_t)g_dev.sp.mem+head->start-0xa4000000);
   }else if((int)head->start>=0x80000000&&(int)head->start<0x80800000) {
     source=(void *)((uintptr_t)g_dev.rdram.dram+head->start-(uintptr_t)0x80000000);
@@ -8622,6 +8630,9 @@ static void pagespan_ds(void)
 }
 
 /**** Recompiler ****/
+#ifdef HAVE_LIBNX
+ALIGN(4096, char jit_memory[33554432]) __attribute__((section(".text")));
+#endif
 void new_dynarec_init(void)
 {
   DebugMessage(M64MSG_INFO, "Init new dynarec");
@@ -8638,9 +8649,17 @@ void new_dynarec_init(void)
 #define DOUBLE_CACHE_ADDR 3   // Put the dynarec cache at random address with RW address != RX address
 
 // Default to fixed cache address
+#ifdef HAVE_LIBNX
+#define CACHE_ADDR DOUBLE_CACHE_ADDR
+#else
 #define CACHE_ADDR FIXED_CACHE_ADDR
+#endif
 
 #if CACHE_ADDR==DOUBLE_CACHE_ADDR
+#ifdef HAVE_LIBNX
+  base_addr = mmap((u_char *)jit_memory, 1<<TARGET_SIZE_2, 0,0,0,0);
+  base_addr_rx = (void*)jit_memory;
+#else
   #include <unistd.h>
   #include <sys/types.h>
   #include <fcntl.h>
@@ -8661,6 +8680,7 @@ void new_dynarec_init(void)
 
   assert(base_addr_rx!=(void*)-1);
   close(fd);
+#endif // HAVE_LIBNX
 #elif CACHE_ADDR==FIXED_CACHE_ADDR
   mprotect ((u_char *)g_dev.r4300.extra_memory, 1<<TARGET_SIZE_2,
             PROT_READ | PROT_WRITE | PROT_EXEC);
@@ -8717,7 +8737,11 @@ void new_dynarec_init(void)
   // Copy this into local area so we don't have to put it in every literal pool
   g_dev.r4300.new_dynarec_hot_state.invc_ptr=g_dev.r4300.cached_interp.invalid_code;
 #endif
+#ifdef HAVE_LIBNX
   stop_after_jal=0;
+#else
+  stop_after_jal=1;
+#endif
   // TLB
   using_tlb=0;
   for(n=0;n<524288;n++) // 0 .. 0x7FFFFFFF
@@ -8769,7 +8793,11 @@ int new_recompile_block(int addr)
 #endif
   start = (u_int)addr&~3;
   //assert(((u_int)addr&1)==0);
-  if ((int)addr >= 0xa4000000 && (int)addr < 0xa4001000) {
+  if ((int)addr >= 0xA0000000 && (int)addr < 0xA07FFFFF) {
+    source = (u_int *)((uintptr_t)g_dev.rdram.dram+start-0xA0000000);
+    pagelimit = 0xA07FFFFF;
+  }
+  else if ((int)addr >= 0xa4000000 && (int)addr < 0xa4001000) {
     source = (u_int *)((uintptr_t)g_dev.sp.mem+start-0xa4000000);
     pagelimit = 0xa4001000;
   }
