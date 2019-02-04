@@ -45,7 +45,11 @@
 #include "device/rcp/rsp/rsp_core.h"
 
 #if !defined(WIN32)
+#ifndef HAVE_LIBNX
 #include <sys/mman.h>
+#else
+#include "../../../../../switch/mman.h"
+#endif // HAVE_LIBNX
 #endif
 
 #if defined(RECOMPILER_DEBUG) && !defined(RECOMP_DBG)
@@ -1847,6 +1851,7 @@ static void ll_remove_matching_addrs(struct ll_entry **head,intptr_t addr,int sh
 {
   struct ll_entry **cur=head;
   struct ll_entry *next;
+
   while(*cur) {
     if((((uintptr_t)((*cur)->addr)-(uintptr_t)base_addr)>>shift)==((addr-(uintptr_t)base_addr)>>shift) ||
        (((uintptr_t)((*cur)->addr)-(uintptr_t)base_addr-MAX_OUTPUT_BLOCK_SIZE)>>shift)==((addr-(uintptr_t)base_addr)>>shift))
@@ -1980,6 +1985,7 @@ static struct ll_entry *get_dirty(struct r4300_core* r4300,u_int vaddr,u_int fla
     }
     head=head->next;
   }
+  
   return NULL;
 }
 
@@ -2127,7 +2133,6 @@ void *get_addr(u_int vaddr)
     }
     return (void*)(((intptr_t)head->clean_addr-(intptr_t)base_addr)+(intptr_t)base_addr_rx);
   }
-
   int r=new_recompile_block(vaddr);
   if(r==0) return get_addr(vaddr);
   // Execute in unmapped page, generate pagefault execption
@@ -2178,7 +2183,6 @@ void *get_addr_32(u_int vaddr,u_int flags)
      }
     return (void*)(((intptr_t)head->clean_addr-(intptr_t)base_addr)+(intptr_t)base_addr_rx);
   }
-
   int r=new_recompile_block(vaddr);
   if(r==0) return get_addr(vaddr);
   // Execute in unmapped page, generate pagefault execption
@@ -2246,6 +2250,7 @@ static void invalidate_page(u_int page)
     free(head);
     head=next;
   }
+#ifndef HAVE_LIBNX // Skip kill pointer
   head=jump_out[page];
   jump_out[page]=0;
   while(head!=NULL) {
@@ -2261,6 +2266,7 @@ static void invalidate_page(u_int page)
     free(head);
     head=next;
   }
+#endif // HAVE_LIBNX
 }
 void invalidate_block(u_int block)
 {
@@ -2352,7 +2358,9 @@ static void invalidate_all_pages(void)
     }
   }
   #if NEW_DYNAREC >= NEW_DYNAREC_ARM
+  #ifndef HAVE_LIBNX
   cache_flush((char *)base_addr_rx,(char *)base_addr_rx+(1<<TARGET_SIZE_2));
+  #endif // HAVE_LIBNX
   #endif
   #ifdef USE_MINI_HT
   memset(g_dev.r4300.new_dynarec_hot_state.mini_ht,-1,sizeof(g_dev.r4300.new_dynarec_hot_state.mini_ht));
@@ -2399,6 +2407,13 @@ void invalidate_cached_code_new_dynarec(struct r4300_core* r4300, uint32_t addre
 // the dirty list to the clean list.
 void clean_blocks(u_int page)
 {
+#ifdef HAVE_LIBNX
+  return; // Causes perf troubles, skip for now
+  bool jit_was_executable = jit_is_executable;
+  if(jit_is_executable)
+    jit_force_writeable();
+#endif
+
   struct ll_entry *head;
   inv_debug("INV: clean_blocks page=%d\n",page);
   head=jump_dirty[page];
@@ -2457,6 +2472,11 @@ void clean_blocks(u_int page)
     }
     head=head->next;
   }
+
+#ifdef HAVE_LIBNX
+  if(jit_was_executable)
+    jit_force_executable();
+#endif
 }
 
 static void emit_extjump(intptr_t addr, int target)
@@ -8379,7 +8399,13 @@ void new_dynarec_init(void)
   // Copy this into local area so we don't have to put it in every literal pool
   g_dev.r4300.new_dynarec_hot_state.invc_ptr=g_dev.r4300.cached_interp.invalid_code;
 #endif
+
+#ifdef HAVE_LIBNX
+  stop_after_jal=1;
+#else
   stop_after_jal=0;
+#endif // HAVE_LIBNX
+
   // TLB
   using_tlb=0;
   for(n=0;n<524288;n++) // 0 .. 0x7FFFFFFF
@@ -8467,6 +8493,12 @@ int new_recompile_block(int addr)
     DebugMessage(M64MSG_ERROR, "Compile at bogus memory address: %x", (int)addr);
     exit(1);
   }
+
+#ifdef HAVE_LIBNX
+  bool jit_was_executable = jit_is_executable;
+  if(jit_is_executable)
+    jit_force_writeable();
+#endif
 
   /* Pass 1: disassemble */
   /* Pass 2: register dependencies, branch targets */
@@ -11669,7 +11701,9 @@ int new_recompile_block(int addr)
   #if NEW_DYNAREC >= NEW_DYNAREC_ARM
   intptr_t beginning_rx=((intptr_t)beginning-(intptr_t)base_addr)+(intptr_t)base_addr_rx;
   intptr_t out_rx=((intptr_t)out-(intptr_t)base_addr)+(intptr_t)base_addr_rx;
+  #ifndef HAVE_LIBNX
   cache_flush((char *)beginning_rx,(char *)out_rx);
+  #endif // HAVE_LIBNX
   #endif
 
   // If we're within 256K of the end of the buffer,
@@ -11742,6 +11776,13 @@ int new_recompile_block(int addr)
     }
     expirep=(expirep+1)&65535;
   }
+
+  //recompile_end
+#ifdef HAVE_LIBNX
+  if(jit_was_executable)
+    jit_force_executable();
+#endif
+
   return 0;
 }
 
