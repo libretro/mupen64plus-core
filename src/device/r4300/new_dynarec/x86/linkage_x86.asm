@@ -55,14 +55,21 @@ section .note.GNU-stack noalloc noexec nowrite progbits
       add  ebx,_GLOBAL_OFFSET_TABLE_+$$-%%getgot wrt ..gotpc
 %endmacro
 
+%macro get_delta 0
+      call  %%getdelta
+  %%getdelta:
+      pop  ebx
+      sub ebx, %%getdelta
+%endmacro
+
 %ifdef PIC
     %define get_got_address get_GOT
     %define find_local_data(a) ebx + a wrt ..gotoff
     %define find_external_data(a) ebx + a wrt ..got
 %else
-    %define get_got_address
-    %define find_local_data(a) a
-    %define find_extern_data(a) a
+    %define get_got_address get_delta
+    %define find_local_data(a) ebx + a
+    %define find_external_data(a) ebx + a
 %endif
 
 %define g_dev_r4300_new_dynarec_hot_state_stop              (g_dev + offsetof_struct_device_r4300 + offsetof_struct_r4300_core_new_dynarec_hot_state + offsetof_struct_new_dynarec_hot_state_stop)
