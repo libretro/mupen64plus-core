@@ -30,6 +30,9 @@
 #include "main/util.h"
 #include "main/netplay.h"
 
+#include <libretro_private.h>
+#include <mupen64plus-next_common.h>
+
 int open_file_storage(struct file_storage* fstorage, size_t size, const char* filename)
 {
     /* ! Take ownership of filename ! */
@@ -73,8 +76,17 @@ int open_rom_file_storage(struct file_storage* fstorage, const char* filename)
 
 void close_file_storage(struct file_storage* fstorage)
 {
-    free((void*)fstorage->data);
-    free((void*)fstorage->filename);
+    if(fstorage->data)
+    {
+        free((void*)fstorage->data);
+        fstorage->data = NULL;
+    }
+
+    if(fstorage->filename)
+    {
+        free((void*)fstorage->filename);
+        fstorage->filename = NULL;
+    }
 }
 
 
@@ -94,7 +106,7 @@ static void file_storage_save(void* storage, size_t start, size_t size)
 {
     if (netplay_is_init() && netplay_get_controller(0) == -1)
         return;
-
+    
     struct file_storage* fstorage = (struct file_storage*)storage;
 
     file_status_t err;
@@ -112,10 +124,10 @@ static void file_storage_save(void* storage, size_t start, size_t size)
     switch(err)
     {
     case file_open_error:
-        DebugMessage(M64MSG_WARNING, "couldn't open storage file '%s' for writing", fstorage->filename);
+        log_cb(RETRO_LOG_WARN, "Couldn't open storage file '%s' for writing\n", fstorage->filename);
         break;
     case file_write_error:
-        DebugMessage(M64MSG_WARNING, "failed to write storage file '%s'", fstorage->filename);
+        log_cb(RETRO_LOG_WARN, "Failed to write storage file '%s'\n", fstorage->filename);
         break;
     default:
         break;
