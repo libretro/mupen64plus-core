@@ -519,11 +519,11 @@ void gen_interrupt(struct r4300_core* r4300)
 
     if (!r4300->cp0.interrupt_unsafe_state)
     {
-        if (savestates_get_job() == savestates_job_load)
+        /*if (savestates_get_job() == savestates_job_load)
         {
             savestates_load();
             return;
-        }
+        }*/
 
         if (r4300->reset_hard_job)
         {
@@ -614,11 +614,11 @@ void gen_interrupt(struct r4300_core* r4300)
 
     if (!r4300->cp0.interrupt_unsafe_state)
     {
-        if (savestates_get_job() == savestates_job_save)
+        /*if (savestates_get_job() == savestates_job_save)
         {
             savestates_save();
             return;
-        }
+        }*/
     }
 }
 

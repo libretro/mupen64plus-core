@@ -339,7 +339,9 @@ static void *add_pointer(void *src, void* addr)
   //assert((ptr2[4]&0xfffffc1f)==0xd61f0000); //br
   set_jump_target((intptr_t)src,(intptr_t)addr);
   intptr_t ptr_rx=((intptr_t)ptr-(intptr_t)base_addr)+(intptr_t)base_addr_rx;
+  #ifndef HAVE_LIBNX
   cache_flush((void*)ptr_rx, (void*)(ptr_rx+4));
+  #endif // HAVE_LIBNX
   return ptr2;
 }
 
@@ -2920,7 +2922,7 @@ static void emit_adr(intptr_t addr, int rt)
 
   intptr_t offset=addr-(intptr_t)out_rx;
   assert(offset>=-1048576LL&&offset<1048576LL);
-  assem_debug("adr %d,#%d",regname64[rt],offset);
+  assem_debug("adr %s,#%d",regname64[rt],offset);
   output_w32(0x10000000|(offset&0x3)<<29|((offset>>2)&0x7ffff)<<5|rt);
 }
 static void emit_adrp(intptr_t addr, int rt)
@@ -2933,7 +2935,7 @@ static void emit_adrp(intptr_t addr, int rt)
   assert(offset>=-4294967296LL&&offset<4294967296LL);
   offset>>=12;
   assert((((intptr_t)out_rx&~0xfffLL)+(offset<<12))==(addr&~0xfffLL));
-  assem_debug("adrp %d,#%d",regname64[rt],offset);
+  assem_debug("adrp %s,#%d",regname64[rt],offset);
   output_w32(0x90000000|(offset&0x3)<<29|((offset>>2)&0x7ffff)<<5|rt);
 }
 static void emit_pc_relative_addr(intptr_t addr, int rt)
@@ -5009,7 +5011,8 @@ static void multdiv_assemble_arm64(int i,struct regstat *i_regs)
         assert(r1l>=0);
         assert(r2l>=0);
 
-        for(int hr=0;hr<HOST_REGS;hr++) {
+        int hr;
+        for(hr=0;hr<HOST_REGS;hr++) {
           if(i_regs->regmap[hr]>=0) reglist|=1<<hr;
         }
 
@@ -5122,7 +5125,9 @@ static void do_clear_cache(void)
               end+=4096;
               j++;
             }else{
+              #ifndef HAVE_LIBNX
               cache_flush((char *)start,(char *)end);
+              #endif // HAVE_LIBNX
               break;
             }
           }
@@ -5158,6 +5163,12 @@ static void arch_init(void) {
   jump_table_symbols[4] = (intptr_t)cached_interp_DDIV;
   jump_table_symbols[5] = (intptr_t)cached_interp_DDIVU;
 
+#ifdef HAVE_LIBNX
+  bool jit_was_executable = jit_is_executable;
+  if(jit_is_executable)
+    jit_force_writeable();
+#endif
+
   // Trampolines for jumps >128MB
   intptr_t *ptr,*ptr2,*ptr3;
   ptr=(intptr_t *)jump_table_symbols;
@@ -5179,4 +5190,9 @@ static void arch_init(void) {
     ptr2++;
     ptr3+=2;
   }
+  
+#ifdef HAVE_LIBNX
+  if(jit_was_executable)
+    jit_force_executable();
+#endif
 }
