@@ -74,6 +74,7 @@
 #include "util.h"
 
 #include <libretro_private.h>
+#include <libco.h>
 
 #ifdef HAVE_LIBNX
 #include <sys/stat.h>
@@ -1266,6 +1267,7 @@ m64p_error main_run(void)
         }
     }
 
+#if 0
     igbcam_backend->close(gbcam_backend);
     igbcam_backend->release(gbcam_backend);
 
@@ -1274,7 +1276,9 @@ m64p_error main_run(void)
     close_file_storage(&eep);
     close_file_storage(&mpk);
     close_file_storage(&dd_disk);
+#endif
 
+    /* Emulation stopped */
     rsp.romClosed();
     input.romClosed();
     audio.romClosed();
@@ -1283,6 +1287,13 @@ m64p_error main_run(void)
     // clean up
     g_EmulatorRunning = 0;
     StateChanged(M64CORE_EMU_STATE, M64EMU_STOPPED);
+
+    /**
+     * Actually never returns.
+     * Jump back to frontend for deinit
+     */
+    extern cothread_t retro_thread;
+    co_switch(retro_thread);
 
     return M64ERR_SUCCESS;
 
@@ -1299,6 +1310,7 @@ on_gfx_open_failure:
         }
     }
 
+#if 0
     igbcam_backend->close(gbcam_backend);
     igbcam_backend->release(gbcam_backend);
 
@@ -1308,6 +1320,7 @@ on_gfx_open_failure:
     close_file_storage(&eep);
     close_file_storage(&mpk);
     close_file_storage(&dd_disk);
+#endif
 
     return M64ERR_PLUGIN_FAIL;
 }
