@@ -674,9 +674,6 @@ unsigned int dd_dom_dma_write(void* opaque, uint8_t* dram, uint32_t dram_addr, u
         dram[(dram_addr + i) ^ S8] = mem[(cart_addr + i) ^ S8];
     }
 
-    invalidate_r4300_cached_code(dd->r4300, R4300_KSEG0 + dram_addr, length);
-    invalidate_r4300_cached_code(dd->r4300, R4300_KSEG1 + dram_addr, length);
-
     return cycles;
 }
 

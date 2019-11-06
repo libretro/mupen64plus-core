@@ -118,11 +118,28 @@ void poweron_r4300(struct r4300_core* r4300)
     poweron_cp1(&r4300->cp1);
 }
 
+LONG WINAPI ExceptionHandler(struct _EXCEPTION_POINTERS *ExceptionInfo)
+{
+	if (ExceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION)
+	{
+		// TODO: fix non full mem base
+		uint32_t offset = (uint32_t)((uintptr_t)ExceptionInfo->ExceptionRecord->ExceptionInformation[0x00000001] - (uintptr_t)g_dev.r4300.mem->base);
+		offset &= ~0xfff; // page aligned
+
+		invalidate_r4300_cached_code(&g_dev.r4300, (0x80000000 + offset), 0x1000);
+		invalidate_r4300_cached_code(&g_dev.r4300, (0xa0000000 + offset), 0x1000);
+
+		return EXCEPTION_CONTINUE_EXECUTION;
+	}
+	else
+		return EXCEPTION_EXECUTE_HANDLER;
+}
 
 void run_r4300(struct r4300_core* r4300)
 {
     *r4300_stop(r4300) = 0;
     g_rom_pause = 0;
+	PVOID handler = AddVectoredExceptionHandler(1, ExceptionHandler);
 
     /* clear instruction counters */
 #if defined(COUNT_INSTR)
@@ -189,6 +206,7 @@ void run_r4300(struct r4300_core* r4300)
         free_blocks(&r4300->cached_interp);
     }
 
+	RemoveVectoredExceptionHandler(handler);
     DebugMessage(M64MSG_INFO, "R4300 emulator finished.");
 
     /* print instruction counts */
@@ -233,12 +251,16 @@ unsigned int* r4300_llbit(struct r4300_core* r4300)
 uint32_t* r4300_pc(struct r4300_core* r4300)
 {
 #ifdef NEW_DYNAREC
-    return (r4300->emumode == EMUMODE_DYNAREC)
-        ? (uint32_t*)&r4300->new_dynarec_hot_state.pcaddr
-        : &(*r4300_pc_struct(r4300))->addr;
-#else
-    return &(*r4300_pc_struct(r4300))->addr;
+	if (r4300->emumode == EMUMODE_DYNAREC)
+		return (uint32_t*)&r4300->new_dynarec_hot_state.pcaddr;
+	else
 #endif
+	if (r4300->emumode == EMUMODE_INTERPRETER)
+	{
+		struct precomp_instr* pc = *r4300_pc_struct(r4300);
+		(*r4300_pc_struct(r4300))->addr = r4300->cached_interp.actual->start + (uint32_t)(((uintptr_t)pc - (uintptr_t)r4300->cached_interp.actual->block) / sizeof(struct precomp_instr)) * 4;
+	}
+    return &(*r4300_pc_struct(r4300))->addr;
 }
 
 struct precomp_instr** r4300_pc_struct(struct r4300_core* r4300)
@@ -338,15 +360,11 @@ int r4300_write_aligned_word(struct r4300_core* r4300, uint32_t address, uint32_
 {
     if ((address & UINT32_C(0xc0000000)) != UINT32_C(0x80000000)) {
 
-        invalidate_r4300_cached_code(r4300, address, 4);
-
         address = virtual_to_physical_address(r4300, address, 1);
         if (address == 0) {
             return 0;
         }
     }
-
-    invalidate_r4300_cached_code(r4300, address, 4);
 
     address &= UINT32_C(0x1ffffffc);
 
@@ -367,15 +385,11 @@ int r4300_write_aligned_dword(struct r4300_core* r4300, uint32_t address, uint64
 
     if ((address & UINT32_C(0xc0000000)) != UINT32_C(0x80000000)) {
 
-        invalidate_r4300_cached_code(r4300, address, 8);
-
         address = virtual_to_physical_address(r4300, address, 1);
         if (address == 0) {
             return 0;
         }
     }
-
-    invalidate_r4300_cached_code(r4300, address, 8);
 
     address &= UINT32_C(0x1ffffffc);
 

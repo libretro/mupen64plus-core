@@ -34,6 +34,7 @@
 #include "api/m64p_types.h"
 #include "device/r4300/r4300_core.h"
 #include "device/r4300/idec.h"
+#include "device/memory/memory.h"
 #include "main/main.h"
 #include "osal/preproc.h"
 
@@ -191,9 +192,14 @@ void cached_interp_##name##_IDLE(void) \
 void cached_interp_FIN_BLOCK(void)
 {
     DECLARE_R4300
+
+	uint32_t addr;
+	struct precomp_instr* pc = (*r4300_pc_struct(r4300))-1;
+
+	addr = r4300->cached_interp.actual->start + (uint32_t)(((uintptr_t)pc - (uintptr_t)r4300->cached_interp.actual->block) / sizeof(struct precomp_instr)) * 4;
     if (!r4300->delay_slot)
     {
-        generic_jump_to(r4300, ((*r4300_pc_struct(r4300))-1)->addr+4);
+        generic_jump_to(r4300, addr+4);
 /*
 #ifdef DBG
       if (g_DebuggerActive) update_debugger(*r4300_pc(r4300));
@@ -206,7 +212,7 @@ Used by dynarec only, check should be unnecessary
     {
         struct precomp_block *blk = r4300->cached_interp.actual;
         struct precomp_instr *inst = (*r4300_pc_struct(r4300));
-        generic_jump_to(r4300, ((*r4300_pc_struct(r4300))-1)->addr+4);
+        generic_jump_to(r4300, addr+4);
 
 /*
 #ifdef DBG
@@ -228,7 +234,15 @@ Used by dynarec only, check should be unnecessary
 void cached_interp_NOTCOMPILED(void)
 {
     DECLARE_R4300
-    uint32_t *mem = fast_mem_access(r4300, r4300->cached_interp.blocks[*r4300_pc(r4300)>>12]->start);
+
+	uint32_t paddr = *r4300_pc(r4300);
+	if ((paddr & UINT32_C(0xc0000000)) != UINT32_C(0x80000000))
+	{
+		paddr = virtual_to_physical_address(r4300, paddr, 2);
+		assert(paddr != 0);
+	}
+
+    uint32_t *mem = fast_mem_access(r4300, r4300->cached_interp.blocks[paddr >> 12]->start);
 #ifdef DBG
     DebugMessage(M64MSG_INFO, "NOTCOMPILED: addr = %x ops = %lx", *r4300_pc(r4300), (long) (*r4300_pc_struct(r4300))->ops);
 #endif
@@ -237,7 +251,7 @@ void cached_interp_NOTCOMPILED(void)
         DebugMessage(M64MSG_ERROR, "not compiled exception");
     }
     else {
-        r4300->cached_interp.recompile_block(r4300, mem, r4300->cached_interp.blocks[*r4300_pc(r4300) >> 12], *r4300_pc(r4300));
+        r4300->cached_interp.recompile_block(r4300, mem, r4300->cached_interp.blocks[paddr >> 12], *r4300_pc(r4300));
     }
 
 /*
@@ -379,6 +393,7 @@ enum r4300_opcode r4300_decode(struct precomp_instr* inst, struct r4300_core* r4
     /* assume instr->addr is already setup */
     uint8_t dummy;
     enum r4300_opcode opcode = idec->opcode;
+	uint32_t addr = r4300->cached_interp.actual->start + (uint32_t)(((uintptr_t)inst - (uintptr_t)r4300->cached_interp.actual->block) / sizeof(struct precomp_instr)) * 4;
 
     switch(idec->opcode)
     {
@@ -407,7 +422,7 @@ enum r4300_opcode r4300_decode(struct precomp_instr* inst, struct r4300_core* r4
     case R4300_OP_JAL:
         inst->f.j.inst_index  = (iw & UINT32_C(0x3ffffff));
         /* select normal, idle or out jump type */
-        opcode += infer_jump_sub_type((inst->addr & ~0xfffffff) | (idec_imm(iw, idec) & 0xfffffff), inst->addr, next_iw, block);
+        opcode += infer_jump_sub_type((addr & ~0xfffffff) | (idec_imm(iw, idec) & 0xfffffff), addr, next_iw, block);
         break;
 
     case R4300_OP_BC0F:
@@ -443,7 +458,7 @@ enum r4300_opcode r4300_decode(struct precomp_instr* inst, struct r4300_core* r4
         inst->f.i.immediate  = (int16_t)iw;
 
         /* select normal, idle or out branch type */
-        opcode += infer_jump_sub_type(inst->addr + inst->f.i.immediate*4 + 4, inst->addr, next_iw, block);
+        opcode += infer_jump_sub_type(addr + inst->f.i.immediate*4 + 4, addr, next_iw, block);
         break;
 
     case R4300_OP_ADD:
@@ -705,47 +720,6 @@ enum r4300_opcode r4300_decode(struct precomp_instr* inst, struct r4300_core* r4
     return opcode;
 }
 
-
-static uint32_t update_invalid_addr(struct r4300_core* r4300, uint32_t addr)
-{
-    char* const invalid_code = r4300->cached_interp.invalid_code;
-
-    if ((addr & UINT32_C(0xc0000000)) == UINT32_C(0x80000000))
-    {
-        if (invalid_code[addr>>12]) {
-            invalid_code[(addr^0x20000000)>>12] = 1;
-        }
-        if (invalid_code[(addr^0x20000000)>>12]) {
-            invalid_code[addr>>12] = 1;
-        }
-        return addr;
-    }
-    else
-    {
-        uint32_t paddr = virtual_to_physical_address(r4300, addr, 2);
-        if (paddr)
-        {
-            uint32_t beg_paddr = paddr - (addr - (addr & ~0xfff));
-
-            update_invalid_addr(r4300, paddr);
-
-            if (invalid_code[(beg_paddr+0x000)>>12]) {
-                invalid_code[addr>>12] = 1;
-            }
-            if (invalid_code[(beg_paddr+0xffc)>>12]) {
-                invalid_code[addr>>12] = 1;
-            }
-            if (invalid_code[addr>>12]) {
-                invalid_code[(beg_paddr+0x000)>>12] = 1;
-            }
-            if (invalid_code[addr>>12]) {
-                invalid_code[(beg_paddr+0xffc)>>12] = 1;
-            }
-        }
-        return paddr;
-    }
-}
-
 int get_block_length(const struct precomp_block *block)
 {
     return (block->end-block->start)/4;
@@ -754,14 +728,21 @@ int get_block_length(const struct precomp_block *block)
 size_t get_block_memsize(const struct precomp_block *block)
 {
     int length = get_block_length(block);
-    return ((length+1)+(length>>2)) * sizeof(struct precomp_instr);
+    return (length+2) * sizeof(struct precomp_instr);
 }
 
 void cached_interp_init_block(struct r4300_core* r4300, uint32_t address)
 {
     int i, length;
+	uint32_t paddr = address;
 
-    struct precomp_block** block = &r4300->cached_interp.blocks[address >> 12];
+	if ((address & UINT32_C(0xc0000000)) != UINT32_C(0x80000000))
+	{
+		paddr = virtual_to_physical_address(r4300, address, 2);
+		assert(paddr != 0);
+		r4300->cached_interp.invalid_code[paddr >> 12] = 0;
+	}
+    struct precomp_block** block = &r4300->cached_interp.blocks[paddr >> 12];
 
     /* allocate block */
     if (*block == NULL) {
@@ -774,6 +755,7 @@ void cached_interp_init_block(struct r4300_core* r4300, uint32_t address)
     struct precomp_block* b = *block;
 
     length = get_block_length(b);
+	assert(length == 1024);
 
 #ifdef DBG
     DebugMessage(M64MSG_INFO, "init block %" PRIX32 " - %" PRIX32, b->start, b->end);
@@ -793,9 +775,8 @@ void cached_interp_init_block(struct r4300_core* r4300, uint32_t address)
     }
 
     /* reset block instructions (addr + ops) */
-    for (i = 0; i < length; ++i)
+    for (i = 0; i < length+2; ++i)
     {
-        b->block[i].addr = b->start + 4*i;
         b->block[i].ops = cached_interp_NOTCOMPILED;
     }
 
@@ -804,28 +785,16 @@ void cached_interp_init_block(struct r4300_core* r4300, uint32_t address)
      */
     r4300->cached_interp.invalid_code[b->start>>12] = 0;
 
-
-    if (b->end < UINT32_C(0x80000000) || b->start >= UINT32_C(0xc0000000))
-    {
-        uint32_t paddr = virtual_to_physical_address(r4300, b->start, 2);
-
-        r4300->cached_interp.invalid_code[paddr>>12] = 0;
-        cached_interp_init_block(r4300, paddr);
-
-        paddr += b->end - b->start - 4;
-
-        r4300->cached_interp.invalid_code[paddr>>12] = 0;
-        cached_interp_init_block(r4300, paddr);
-    }
-    else
-    {
-        uint32_t alt_addr = b->start ^ UINT32_C(0x20000000);
-
-        if (r4300->cached_interp.invalid_code[alt_addr>>12])
-        {
-            cached_interp_init_block(r4300, alt_addr);
-        }
-    }
+	// Write protect physical page
+	uint32_t *mem = fast_mem_access(r4300, (paddr&~0xfff));
+	assert(mem != NULL);
+	if(mem != NULL)
+	{
+		assert(((uintptr_t)mem & 0xfff) == 0);
+		DWORD old_protect;
+		if(!VirtualProtect((LPVOID)mem, 0x1000, PAGE_READONLY, &old_protect))
+			DebugMessage(M64MSG_ERROR, "Failed to change page permission");
+	}
 }
 
 void cached_interp_free_block(struct precomp_block* block)
@@ -838,50 +807,43 @@ void cached_interp_free_block(struct precomp_block* block)
 
 void cached_interp_recompile_block(struct r4300_core* r4300, const uint32_t* iw, struct precomp_block* block, uint32_t func)
 {
-    int i, length, length2, finished;
+    int i, length, finished;
     struct precomp_instr* inst;
     enum r4300_opcode opcode;
 
-    /* ??? not sure why we need these 2 different tests */
-    int block_start_in_tlb = ((block->start & UINT32_C(0xc0000000)) != UINT32_C(0x80000000));
-    int block_not_in_tlb = (block->start >= UINT32_C(0xc0000000) || block->end < UINT32_C(0x80000000));
-
     length = get_block_length(block);
-    length2 = length - 2 + (length >> 2);
 
     /* reset xxhash */
     block->xxhash = 0;
-
 
     for (i = (func & 0xFFF) / 4, finished = 0; finished != 2; ++i)
     {
         inst = block->block + i;
 
-        /* set decoded instruction address */
-        inst->addr = block->start + i * 4;
-
-        if (block_start_in_tlb)
-        {
-            uint32_t address2 = virtual_to_physical_address(r4300, inst->addr, 0);
-            if (r4300->cached_interp.blocks[address2>>12]->block[(address2&UINT32_C(0xFFF))/4].ops == cached_interp_NOTCOMPILED) {
-                r4300->cached_interp.blocks[address2>>12]->block[(address2&UINT32_C(0xFFF))/4].ops = cached_interp_NOTCOMPILED2;
-            }
-        }
+		if (inst->ops != cached_interp_NOTCOMPILED)
+		{
+			finished = 2;
+			continue;
+		}
 
         /* decode instruction */
         opcode = r4300_decode(inst, r4300, r4300_get_idec(iw[i]), iw[i], iw[i+1], block);
 
         /* decode ending conditions */
-        if (i >= length2) { finished = 2; }
-        if (i >= (length-1)
-        && (block->start == UINT32_C(0xa4000000) || block_not_in_tlb)) { finished = 2; }
-        if (opcode == R4300_OP_ERET || finished == 1) { finished = 2; }
-        if (/*i >= length && */
-                (opcode == R4300_OP_J ||
-                 opcode == R4300_OP_J_OUT ||
-                 opcode == R4300_OP_JR ||
-                 opcode == R4300_OP_JR_OUT) &&
-                !(i >= (length-1) && block_not_in_tlb)) {
+		if(i >= (length-1))
+		{
+			finished = 2;
+			continue;
+		}
+
+        if (opcode == R4300_OP_ERET || finished == 1)
+			finished = 2;
+
+        if ((opcode == R4300_OP_J ||
+             opcode == R4300_OP_J_OUT ||
+             opcode == R4300_OP_JR ||
+             opcode == R4300_OP_JR_OUT) &&
+            !(i >= (length-1))) {
             finished = 1;
         }
     }
@@ -889,16 +851,11 @@ void cached_interp_recompile_block(struct r4300_core* r4300, const uint32_t* iw,
     if (i >= length)
     {
         inst = block->block + i;
-        inst->addr = block->start + i*4;
         inst->ops = cached_interp_FIN_BLOCK;
         ++i;
-        if (i <= length2) // useful when last opcode is a jump
-        {
-            inst = block->block + i;
-            inst->addr = block->start + i*4;
-            inst->ops = cached_interp_FIN_BLOCK;
-            i++;
-        }
+        // useful when last opcode is a jump
+        inst = block->block + i;
+        inst->ops = cached_interp_FIN_BLOCK;
     }
 
 #ifdef DBG
@@ -914,17 +871,52 @@ void cached_interpreter_jump_to(struct r4300_core* r4300, uint32_t address)
         return;
     }
 
-    if (!update_invalid_addr(r4300, address)) {
-        return;
-    }
+	if ((address & UINT32_C(0xc0000000)) != UINT32_C(0x80000000))
+	{
+		uint32_t paddr = virtual_to_physical_address(r4300, address, 2);
 
-    /* setup new block if invalid */
-    if (cinterp->invalid_code[address >> 12]) {
-        r4300->cached_interp.init_block(r4300, address);
-    }
+		if (!paddr)
+			return;
 
-    /* set new PC */
-    cinterp->actual = cinterp->blocks[address >> 12];
+		/* physical block is invalid */
+		if (cinterp->invalid_code[paddr >> 12])
+		{
+			r4300->cached_interp.init_block(r4300, address);
+			r4300->cached_interp.blocks[paddr >> 12]->start = address & ~UINT32_C(0xfff);
+			r4300->cached_interp.blocks[paddr >> 12]->end = (address & ~UINT32_C(0xfff)) + 0x1000;
+		}
+		/* virtual block is invalid */
+		else if (cinterp->invalid_code[address >> 12])
+		{
+			if (r4300->cached_interp.blocks[paddr >> 12] == NULL)
+			{
+				/* create physical block if missing */
+				r4300->cached_interp.init_block(r4300, address);
+			}
+			else
+			{
+				/* update start/end address */
+				r4300->cached_interp.blocks[paddr >> 12]->start = address & ~UINT32_C(0xfff);
+				r4300->cached_interp.blocks[paddr >> 12]->end = (address & ~UINT32_C(0xfff)) + 0x1000;
+				/* physical and virtual pages are now valid */
+				cinterp->invalid_code[paddr >> 12] = 0;
+				cinterp->invalid_code[address >> 12] = 0;
+			}
+		}
+
+		/* set new PC */
+		cinterp->actual = cinterp->blocks[paddr >> 12];
+	}
+	else
+	{
+		/* setup new block if invalid */
+		if (cinterp->invalid_code[address >> 12]) {
+			r4300->cached_interp.init_block(r4300, address);
+		}
+		/* set new PC */
+		cinterp->actual = cinterp->blocks[address >> 12];
+	}
+
     (*r4300_pc_struct(r4300)) = cinterp->actual->block + ((address - cinterp->actual->start) >> 2);
 }
 
@@ -955,42 +947,26 @@ void free_blocks(struct cached_interp* cinterp)
 
 void invalidate_cached_code_hacktarux(struct r4300_core* r4300, uint32_t address, size_t size)
 {
-    size_t i;
-    uint32_t addr;
-    uint32_t addr_max;
+	DWORD old_protect;
 
     if (size == 0)
     {
         /* invalidate everthing */
+		// TODO: fix non full mem base
         memset(r4300->cached_interp.invalid_code, 1, 0x100000);
+		if(!VirtualProtect((LPVOID)g_dev.mem.base, 0x20000000, PAGE_READWRITE, &old_protect))
+			DebugMessage(M64MSG_ERROR, "Failed to change page permission");
     }
     else
     {
-        /* invalidate blocks (if necessary) */
-        addr_max = address+size;
+		// TODO: fix non full mem base
+		assert((address & 0xfff) == 0);
+		assert(size == 0x1000);
+		uintptr_t addr = (uintptr_t)g_dev.r4300.mem->base + (address & 0x1fffffff);
+		if(!VirtualProtect((LPVOID)addr, 0x1000, PAGE_READWRITE, &old_protect))
+			DebugMessage(M64MSG_ERROR, "Failed to change page permission");
 
-        for(addr = address; addr < addr_max; addr += 4)
-        {
-            i = (addr >> 12);
-
-            if (r4300->cached_interp.invalid_code[i] == 0)
-            {
-                if (r4300->cached_interp.blocks[i] == NULL
-                 || r4300->cached_interp.blocks[i]->block[(addr & 0xfff) / 4].ops != r4300->cached_interp.not_compiled)
-                {
-                    r4300->cached_interp.invalid_code[i] = 1;
-                    /* go directly to next i */
-                    addr &= ~0xfff;
-                    addr |= 0xffc;
-                }
-            }
-            else
-            {
-                /* go directly to next i */
-                addr &= ~0xfff;
-                addr |= 0xffc;
-            }
-        }
+		r4300->cached_interp.invalid_code[address >> 12] = 1;
     }
 }
 

@@ -235,7 +235,8 @@ void* init_mem_base(void)
     void* mem_base;
 
     /* First try the full mem base alloc */
-    mem_base = malloc(MB_MAX_SIZE_FULL);
+	// TODO: not platform specific
+    mem_base = _aligned_malloc(MB_MAX_SIZE_FULL, 0x1000);
     if (mem_base == NULL) {
         /* if it failed, try the compressed mem base alloc */
         mem_base = malloc(MB_MAX_SIZE);
@@ -257,7 +258,13 @@ void* init_mem_base(void)
 
 void release_mem_base(void* mem_base)
 {
-    free(MEM_BASE_PTR(mem_base));
+	// TODO: fix non full mem base
+	DWORD old_protect;
+	if(!VirtualProtect((LPVOID)mem_base, 0x20000000, PAGE_READWRITE, &old_protect))
+		DebugMessage(M64MSG_ERROR, "Failed to change page permission");
+
+	// TODO: not platform specific
+	_aligned_free(MEM_BASE_PTR(mem_base));
 }
 
 uint32_t* mem_base_u32(void* mem_base, uint32_t address)

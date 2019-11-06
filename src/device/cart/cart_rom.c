@@ -111,9 +111,6 @@ unsigned int cart_rom_dma_write(void* opaque, uint8_t* dram, uint32_t dram_addr,
         }
     }
 
-    /* invalidate cached code */
-    invalidate_r4300_cached_code(cart_rom->r4300, 0x80000000 + dram_addr, length);
-    invalidate_r4300_cached_code(cart_rom->r4300, 0xa0000000 + dram_addr, length);
 
     return (length / 8) + add_random_interrupt_time(cart_rom->r4300);
 }

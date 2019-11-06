@@ -75,15 +75,11 @@ static uint8_t read_address_8bit(struct r4300_core* r4300, uint32_t address)
 static void update_address_16bit(struct r4300_core* r4300, uint32_t address, uint16_t new_value)
 {
     *(uint16_t*)(((unsigned char*)r4300->rdram->dram + ((address & 0xFFFFFF)^S16))) = new_value;
-    /* mask out bit 24 which is used by GS codes to specify 8/16 bits */
-    address &= 0xfeffffff;
-    invalidate_r4300_cached_code(r4300, address, 2);
 }
 
 static void update_address_8bit(struct r4300_core* r4300, uint32_t address, uint8_t new_value)
 {
     *(uint8_t*)(((unsigned char*)r4300->rdram->dram + ((address & 0xFFFFFF)^S8))) = new_value;
-    invalidate_r4300_cached_code(r4300, address, 1);
 }
 
 static int address_equal_to_8bit(struct r4300_core* r4300, uint32_t address, uint8_t value)
