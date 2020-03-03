@@ -37,6 +37,7 @@ enum r4300_opcode r4300_decode(struct precomp_instr* inst, struct r4300_core* r4
 
 int get_block_length(const struct precomp_block *block);
 size_t get_block_memsize(const struct precomp_block *block);
+uint32_t get_instruction_addr(struct r4300_core* r4300, const struct precomp_instr* inst);
 
 void cached_interp_init_block(struct r4300_core* r4300, uint32_t address);
 void cached_interp_free_block(struct precomp_block* block);

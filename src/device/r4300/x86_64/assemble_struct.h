@@ -44,7 +44,7 @@ struct reg_cache
 
 struct jump_table
 {
-    unsigned int mi_addr;
+    struct precomp_instr* mi_addr;
     unsigned int pc_addr;
     unsigned int absolute64;
 };

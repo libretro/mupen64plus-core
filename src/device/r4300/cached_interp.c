@@ -192,11 +192,7 @@ void cached_interp_##name##_IDLE(void) \
 void cached_interp_FIN_BLOCK(void)
 {
     DECLARE_R4300
-
-	uint32_t addr;
-	struct precomp_instr* pc = (*r4300_pc_struct(r4300))-1;
-
-	addr = r4300->cached_interp.actual->start + (uint32_t)(((uintptr_t)pc - (uintptr_t)r4300->cached_interp.actual->block) / sizeof(struct precomp_instr)) * 4;
+    uint32_t addr = get_instruction_addr(r4300, (*r4300_pc_struct(r4300)) - 1);
     if (!r4300->delay_slot)
     {
         generic_jump_to(r4300, addr+4);
@@ -393,7 +389,7 @@ enum r4300_opcode r4300_decode(struct precomp_instr* inst, struct r4300_core* r4
     /* assume instr->addr is already setup */
     uint8_t dummy;
     enum r4300_opcode opcode = idec->opcode;
-	uint32_t addr = r4300->cached_interp.actual->start + (uint32_t)(((uintptr_t)inst - (uintptr_t)r4300->cached_interp.actual->block) / sizeof(struct precomp_instr)) * 4;
+    uint32_t addr = get_instruction_addr(r4300, inst);
 
     switch(idec->opcode)
     {
@@ -718,6 +714,11 @@ enum r4300_opcode r4300_decode(struct precomp_instr* inst, struct r4300_core* r4
 
     /* propagate opcode info to allow further processing */
     return opcode;
+}
+
+uint32_t get_instruction_addr(struct r4300_core* r4300, const struct precomp_instr* inst)
+{
+    return r4300->cached_interp.actual->start + (uint32_t)(((uintptr_t)inst - (uintptr_t)r4300->cached_interp.actual->block) / sizeof(struct precomp_instr)) * 4;
 }
 
 int get_block_length(const struct precomp_block *block)

@@ -255,12 +255,10 @@ uint32_t* r4300_pc(struct r4300_core* r4300)
 		return (uint32_t*)&r4300->new_dynarec_hot_state.pcaddr;
 	else
 #endif
-	if (r4300->emumode == EMUMODE_INTERPRETER)
-	{
-		struct precomp_instr* pc = *r4300_pc_struct(r4300);
-		(*r4300_pc_struct(r4300))->addr = r4300->cached_interp.actual->start + (uint32_t)(((uintptr_t)pc - (uintptr_t)r4300->cached_interp.actual->block) / sizeof(struct precomp_instr)) * 4;
-	}
-    return &(*r4300_pc_struct(r4300))->addr;
+	if (r4300->emumode != EMUMODE_PURE_INTERPRETER)
+        r4300->pcaddr = get_instruction_addr(r4300 , *r4300_pc_struct(r4300));
+
+    return &r4300->pcaddr;
 }
 
 struct precomp_instr** r4300_pc_struct(struct r4300_core* r4300)

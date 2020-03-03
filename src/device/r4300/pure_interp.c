@@ -40,8 +40,8 @@
 static void InterpretOpcode(struct r4300_core* r4300);
 
 #define DECLARE_R4300
-#define PCADDR r4300->interp_PC.addr
-#define ADD_TO_PC(x) r4300->interp_PC.addr += x*4;
+#define PCADDR r4300->pcaddr
+#define ADD_TO_PC(x) r4300->pcaddr += x*4;
 #define DECLARE_INSTRUCTION(name) static void name(struct r4300_core* r4300, uint32_t op)
 #define DECLARE_JUMP(name, destination, condition, link, likely, cop1) \
    static void name(struct r4300_core* r4300, uint32_t op) \
@@ -52,26 +52,26 @@ static void InterpretOpcode(struct r4300_core* r4300);
       if (cop1 && check_cop1_unusable(r4300)) return; \
       if (link_register != &r4300_regs(r4300)[0]) \
       { \
-          *link_register = SE32(r4300->interp_PC.addr + 8); \
+          *link_register = SE32(r4300->pcaddr + 8); \
       } \
       if (!likely || take_jump) \
       { \
-        r4300->interp_PC.addr += 4; \
+        r4300->pcaddr += 4; \
         r4300->delay_slot=1; \
         InterpretOpcode(r4300); \
         cp0_update_count(r4300); \
         r4300->delay_slot=0; \
         if (take_jump && !r4300->skip_jump) \
         { \
-          r4300->interp_PC.addr = jump_target; \
+          r4300->pcaddr = jump_target; \
         } \
       } \
       else \
       { \
-         r4300->interp_PC.addr += 8; \
+         r4300->pcaddr += 8; \
          cp0_update_count(r4300); \
       } \
-      r4300->cp0.last_addr = r4300->interp_PC.addr; \
+      r4300->cp0.last_addr = r4300->pcaddr; \
       if (*r4300_cp0_cycle_count(&r4300->cp0) >= 0) gen_interrupt(r4300); \
    } \
    static void name##_IDLE(struct r4300_core* r4300, uint32_t op) \
@@ -718,7 +718,6 @@ void InterpretOpcode(struct r4300_core* r4300)
 void run_pure_interpreter(struct r4300_core* r4300)
 {
    *r4300_stop(r4300) = 0;
-   *r4300_pc_struct(r4300) = &r4300->interp_PC;
    *r4300_pc(r4300) = r4300->cp0.last_addr = 0xa4000040;
 
    while (!*r4300_stop(r4300))

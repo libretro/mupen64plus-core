@@ -75,7 +75,7 @@ void jump_start_rel8(struct r4300_core* r4300);
 void jump_end_rel8(struct r4300_core* r4300);
 void jump_start_rel32(struct r4300_core* r4300);
 void jump_end_rel32(struct r4300_core* r4300);
-void add_jump(struct r4300_core* r4300, unsigned int pc_addr, unsigned int mi_addr, unsigned int absolute64);
+void add_jump(struct r4300_core* r4300, unsigned int pc_addr, struct precomp_instr* mi_addr, unsigned int absolute64);
 
 static osal_inline void put8(unsigned char octet)
 {
@@ -587,7 +587,7 @@ static osal_inline void mov_m32rel_imm32(unsigned int *m32, unsigned int imm32)
     put32(imm32);
 }
 
-static osal_inline void jmp(unsigned int mi_addr)
+static osal_inline void jmp(struct precomp_instr* mi_addr)
 {
     struct r4300_core* r4300 = &g_dev.r4300;
 

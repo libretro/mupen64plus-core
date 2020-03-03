@@ -29,6 +29,7 @@
 #include "assemble_struct.h"
 #include "regcache.h"
 #include "device/r4300/recomp.h"
+#include "device/r4300/cached_interp.h"
 #include "osal/preproc.h"
 
 /* Placeholder for RIP-relative offsets is maxmimum 32-bit signed value.
@@ -39,7 +40,7 @@
 
 /* Static Functions */
 
-void add_jump(struct r4300_core* r4300, unsigned int pc_addr, unsigned int mi_addr, unsigned int absolute64)
+void add_jump(struct r4300_core* r4300, unsigned int pc_addr, struct precomp_instr* mi_addr, unsigned int absolute64)
 {
     if (r4300->recomp.jumps_number == r4300->recomp.max_jumps_number)
     {
@@ -110,7 +111,7 @@ void passe2(struct r4300_core* r4300, struct precomp_instr *dest, int start, int
      */
     for (i = 0; i < r4300->recomp.jumps_number; i++)
     {
-        struct precomp_instr *jump_instr = dest + ((r4300->recomp.jumps_table[i].mi_addr - dest[0].addr) / 4);
+        struct precomp_instr *jump_instr = dest;
         unsigned int   jmp_offset_loc = r4300->recomp.jumps_table[i].pc_addr;
         unsigned char *addr_dest = NULL;
         /* calculate the destination address to jump to */

@@ -74,6 +74,7 @@ struct r4300_core
     int64_t regs[32];
     int64_t hi;
     int64_t lo;
+    uint32_t pcaddr;
 #endif
     unsigned int llbit;
 
@@ -89,9 +90,6 @@ struct r4300_core
 
     /* When reset_hard_job is set, next interrupt will cause hard reset */
     int reset_hard_job;
-
-    /* from pure_interp.c */
-    struct precomp_instr interp_PC;
 
     /* from cached_interp.c.
      * XXX: more work is needed to correctly encapsulate these */

@@ -131,7 +131,7 @@ static void gencheck_cop1_unusable(struct r4300_core* r4300)
     jump_end_rel8(r4300);
 }
 
-static void gencp0_update_count(struct r4300_core* r4300, unsigned int addr)
+/*static void gencp0_update_count(struct r4300_core* r4300, unsigned int addr)
 {
 #if !defined(COMPARE_CORE) && !defined(DBG)
     mov_reg32_imm32(EAX, addr);
@@ -205,7 +205,7 @@ static void gendelayslot(struct r4300_core* r4300)
     gencp0_update_count(r4300, r4300->recomp.dst->addr+4);
 
     mov_m32rel_imm32((void*)(&r4300->delay_slot), 0);
-}
+}*/
 
 static void ld_register_alloc(struct r4300_core* r4300, int *pGpr1, int *pGpr2, int *pBase1, int *pBase2)
 {
@@ -350,7 +350,8 @@ void gennotcompiled(struct r4300_core* r4300)
 void genlink_subblock(struct r4300_core* r4300)
 {
     free_all_registers(r4300);
-    jmp(r4300->recomp.dst->addr+4);
+    jmp(r4300->recomp.dst+1);
+    //jmp(r4300->recomp.dst->addr+4);
 }
 
 void genfin_block(struct r4300_core* r4300)
@@ -881,6 +882,7 @@ void gen_SB(struct r4300_core* r4300)
 #ifdef INTERPRET_SB
     gencallinterp(r4300, (unsigned long long)cached_interp_SB, 0);
 #else
+    //put8(0xcc);
     free_registers_move_start(r4300);
 
     /* get value in EDX */
@@ -964,6 +966,7 @@ void gen_SB(struct r4300_core* r4300)
 
 void gen_SH(struct r4300_core* r4300)
 {
+    //put8(0xcc);
 #if defined(COUNT_INSTR)
     inc_m32rel(&instr_count[33]);
 #endif
@@ -1061,6 +1064,7 @@ void gen_SC(struct r4300_core* r4300)
 
 void gen_SW(struct r4300_core* r4300)
 {
+    //put8(0xcc);
 #if defined(COUNT_INSTR)
     inc_m32rel(&instr_count[34]);
 #endif
@@ -1152,6 +1156,7 @@ void gen_SWR(struct r4300_core* r4300)
 
 void gen_SD(struct r4300_core* r4300)
 {
+    //put8(0xcc);
 #if defined(COUNT_INSTR)
     inc_m32rel(&instr_count[45]);
 #endif
@@ -2285,7 +2290,7 @@ void gen_MTLO(struct r4300_core* r4300)
 
 /* Jump & Branch instructions */
 
-static void gentest(struct r4300_core* r4300)
+/*static void gentest(struct r4300_core* r4300)
 {
     cmp_m32rel_imm32((unsigned int *)(&r4300->recomp.branch_taken), 0);
     je_near_rj(0);
@@ -2415,7 +2420,7 @@ static void genbranchlink(struct r4300_core* r4300)
         mov_reg32_imm32(r31, r4300->recomp.dst->addr+8);
         movsxd_reg64_reg32(r31, r31);
     }
-}
+}*/
 
 void gen_J(struct r4300_core* r4300)
 {
@@ -2743,7 +2748,7 @@ void gen_JALR(struct r4300_core* r4300)
 #endif
 }
 
-static void genbeq_test(struct r4300_core* r4300)
+/*static void genbeq_test(struct r4300_core* r4300)
 {
     int rs_64bit = is64(r4300, (unsigned int *)r4300->recomp.dst->f.i.rs);
     int rt_64bit = is64(r4300, (unsigned int *)r4300->recomp.dst->f.i.rt);
@@ -2777,7 +2782,7 @@ static void genbeq_test(struct r4300_core* r4300)
         cmp_reg64_reg64(rs, rt);
         sete_m8rel((unsigned char *) &r4300->recomp.branch_taken);
     }
-}
+}*/
 
 void gen_BEQ(struct r4300_core* r4300)
 {
@@ -2899,7 +2904,7 @@ void gen_BEQL_IDLE(struct r4300_core* r4300)
 #endif
 }
 
-static void genbne_test(struct r4300_core* r4300)
+/*static void genbne_test(struct r4300_core* r4300)
 {
     int rs_64bit = is64(r4300, (unsigned int *)r4300->recomp.dst->f.i.rs);
     int rt_64bit = is64(r4300, (unsigned int *)r4300->recomp.dst->f.i.rt);
@@ -2934,7 +2939,7 @@ static void genbne_test(struct r4300_core* r4300)
         cmp_reg64_reg64(rs, rt);
         setne_m8rel((unsigned char *) &r4300->recomp.branch_taken);
     }
-}
+}*/
 
 void gen_BNE(struct r4300_core* r4300)
 {
@@ -3056,7 +3061,7 @@ void gen_BNEL_IDLE(struct r4300_core* r4300)
 #endif
 }
 
-static void genblez_test(struct r4300_core* r4300)
+/*static void genblez_test(struct r4300_core* r4300)
 {
     int rs_64bit = is64(r4300, (unsigned int *)r4300->recomp.dst->f.i.rs);
 
@@ -3074,7 +3079,7 @@ static void genblez_test(struct r4300_core* r4300)
         cmp_reg64_imm8(rs, 0);
         setle_m8rel((unsigned char *) &r4300->recomp.branch_taken);
     }
-}
+}*/
 
 void gen_BLEZ(struct r4300_core* r4300)
 {
@@ -3196,7 +3201,7 @@ void gen_BLEZL_IDLE(struct r4300_core* r4300)
 #endif
 }
 
-static void genbgtz_test(struct r4300_core* r4300)
+/*static void genbgtz_test(struct r4300_core* r4300)
 {
     int rs_64bit = is64(r4300, (unsigned int *)r4300->recomp.dst->f.i.rs);
 
@@ -3214,7 +3219,7 @@ static void genbgtz_test(struct r4300_core* r4300)
         cmp_reg64_imm8(rs, 0);
         setg_m8rel((unsigned char *) &r4300->recomp.branch_taken);
     }
-}
+}*/
 
 void gen_BGTZ(struct r4300_core* r4300)
 {
@@ -3336,7 +3341,7 @@ void gen_BGTZL_IDLE(struct r4300_core* r4300)
 #endif
 }
 
-static void genbltz_test(struct r4300_core* r4300)
+/*static void genbltz_test(struct r4300_core* r4300)
 {
     int rs_64bit = is64(r4300, (unsigned int *)r4300->recomp.dst->f.i.rs);
 
@@ -3359,7 +3364,7 @@ static void genbltz_test(struct r4300_core* r4300)
         cmp_reg64_imm8(rs, 0);
         setl_m8rel((unsigned char *) &r4300->recomp.branch_taken);
     }
-}
+}*/
 
 void gen_BLTZ(struct r4300_core* r4300)
 {
@@ -3607,7 +3612,7 @@ void gen_BLTZALL_IDLE(struct r4300_core* r4300)
 #endif
 }
 
-static void genbgez_test(struct r4300_core* r4300)
+/*static void genbgez_test(struct r4300_core* r4300)
 {
     int rs_64bit = is64(r4300, (unsigned int *)r4300->recomp.dst->f.i.rs);
 
@@ -3628,7 +3633,7 @@ static void genbgez_test(struct r4300_core* r4300)
         cmp_reg64_imm8(rs, 0);
         setge_m8rel((unsigned char *) &r4300->recomp.branch_taken);
     }
-}
+}*/
 
 void gen_BGEZ(struct r4300_core* r4300)
 {
@@ -3876,11 +3881,11 @@ void gen_BGEZALL_IDLE(struct r4300_core* r4300)
 #endif
 }
 
-static void genbc1f_test(struct r4300_core* r4300)
+/*static void genbc1f_test(struct r4300_core* r4300)
 {
     test_m32rel_imm32((unsigned int*)&(*r4300_cp1_fcr31(&r4300->cp1)), 0x800000);
     sete_m8rel((unsigned char *) &r4300->recomp.branch_taken);
-}
+}*/
 
 void gen_BC1F(struct r4300_core* r4300)
 {
@@ -4008,11 +4013,11 @@ void gen_BC1FL_IDLE(struct r4300_core* r4300)
 #endif
 }
 
-static void genbc1t_test(struct r4300_core* r4300)
+/*static void genbc1t_test(struct r4300_core* r4300)
 {
     test_m32rel_imm32((unsigned int*)&(*r4300_cp1_fcr31(&r4300->cp1)), 0x800000);
     setne_m8rel((unsigned char *) &r4300->recomp.branch_taken);
-}
+}*/
 
 void gen_BC1T(struct r4300_core* r4300)
 {
@@ -4379,6 +4384,7 @@ void gen_LDC1(struct r4300_core* r4300)
 
 void gen_SWC1(struct r4300_core* r4300)
 {
+    //put8(0xcc);
 #if defined(COUNT_INSTR)
     inc_m32rel(&instr_count[43]);
 #endif
@@ -4455,6 +4461,7 @@ void gen_SWC1(struct r4300_core* r4300)
 
 void gen_SDC1(struct r4300_core* r4300)
 {
+    //put8(0xcc);
 #if defined(COUNT_INSTR)
     inc_m32rel(&instr_count[44]);
 #endif
