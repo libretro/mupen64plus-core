@@ -652,6 +652,11 @@ void dynarec_recompile_block(struct r4300_core* r4300, const uint32_t* iw, struc
         r4300->recomp.dst->reg_cache_infos.need_map = 0;
         r4300->recomp.dst->local_addr = r4300->recomp.code_length;
 
+        /* TOREMOVE */
+        /*uint32_t pcaddr = get_instruction_addr(r4300, r4300->recomp.dst);
+        if (pcaddr == 0xa4000890)
+            pcaddr = 0;*/
+
 #ifdef COMPARE_CORE
         gendebug(r4300);
 #endif

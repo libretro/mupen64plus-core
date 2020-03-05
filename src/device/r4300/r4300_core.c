@@ -36,6 +36,7 @@
 #endif
 #include "main/main.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -148,6 +149,7 @@ void run_r4300(struct r4300_core* r4300)
 
     if (r4300->emumode == EMUMODE_PURE_INTERPRETER)
     {
+        freopen("interpreter.txt", "w+", stdout);
         DebugMessage(M64MSG_INFO, "Starting R4300 emulator: Pure Interpreter");
         r4300->emumode = EMUMODE_PURE_INTERPRETER;
         run_pure_interpreter(r4300);
@@ -163,6 +165,11 @@ void run_r4300(struct r4300_core* r4300)
         new_dyna_start();
         new_dynarec_cleanup();
 #else
+#if defined(__x86_64__)
+        freopen("dynarec_x64.txt", "w+", stdout);
+#else
+        freopen("dynarec_x86.txt", "w+", stdout);
+#endif
         r4300->cached_interp.fin_block = dynarec_fin_block;
         r4300->cached_interp.not_compiled = dynarec_notcompiled;
         r4300->cached_interp.not_compiled2 = dynarec_notcompiled2;
@@ -182,6 +189,7 @@ void run_r4300(struct r4300_core* r4300)
 #endif
     else /* if (r4300->emumode == EMUMODE_INTERPRETER) */
     {
+        freopen("cached_interpreter.txt", "w+", stdout);
         DebugMessage(M64MSG_INFO, "Starting R4300 emulator: Cached Interpreter");
         r4300->emumode = EMUMODE_INTERPRETER;
         r4300->cached_interp.fin_block = cached_interp_FIN_BLOCK;
@@ -451,4 +459,133 @@ void savestates_load_set_pc(struct r4300_core* r4300, uint32_t pc)
 {
     generic_jump_to(r4300, pc);
     invalidate_r4300_cached_code(r4300, 0, 0);
+}
+
+static const char cop0name[32][32] = {
+  "CP0_INDEX_REG",
+  "CP0_RANDOM_REG",
+  "CP0_ENTRYLO0_REG",
+  "CP0_ENTRYLO1_REG",
+  "CP0_CONTEXT_REG",
+  "CP0_PAGEMASK_REG",
+  "CP0_WIRED_REG",
+  "7",
+  "CP0_BADVADDR_REG",
+  "CP0_COUNT_REG",
+  "CP0_ENTRYHI_REG",
+  "CP0_COMPARE_REG",
+  "CP0_STATUS_REG",
+  "CP0_CAUSE_REG",
+  "CP0_EPC_REG",
+  "CP0_PREVID_REG",
+  "CP0_CONFIG_REG",
+  "CP0_LLADDR_REG",
+  "CP0_WATCHLO_REG",
+  "CP0_WATCHHI_REG",
+  "CP0_XCONTEXT_REG",
+  "21",
+  "22",
+  "23",
+  "24",
+  "25",
+  "26",
+  "27",
+  "CP0_TAGLO_REG",
+  "CP0_TAGHI_REG",
+  "CP0_ERROREPC_REG",
+  "31"
+};
+
+static int r64_checksum(int64_t* regs)
+{
+    int i;
+    int sum = 0;
+    for (i = 0; i < 64; i++)
+        sum ^= ((u_int*)regs)[i];
+    return sum;
+}
+
+static int r32_checksum(int* regs)
+{
+    int i;
+    int sum = 0;
+    for (i = 0; i < 32; i++)
+        sum ^= regs[i];
+    return sum;
+}
+
+static int rdram_checksum(int extramem)
+{
+    int i;
+    int sum = 0;
+    int size = (extramem) ? 2097152 : 1048576;
+    for (i = 0; i < size; i++) {
+        unsigned int temp = sum;
+        sum <<= 1;
+        sum |= (~temp) >> 31;
+        sum ^= ((u_int*)g_dev.rdram.dram)[i];
+    }
+    return sum;
+}
+
+void print_state(struct r4300_core* r4300, int force)
+{
+    static int allow_print = 0;
+    struct cp0* cp0 = &r4300->cp0;
+    struct cp1* cp1 = &r4300->cp1;
+    int pcaddr = 0;
+
+    if (r4300->cached_interp.actual != NULL && (*r4300_pc_struct(r4300) != NULL || (r4300->emumode == EMUMODE_DYNAREC)))
+    {
+        pcaddr = *r4300_pc(r4300);
+        cp0_update_count(r4300);
+    }
+
+    // Last good
+    if ((pcaddr == 0x8031b0ac) && (r4300_cp0_regs(cp0)[CP0_COUNT_REG] == 0x0ff69ca0))
+        allow_print = 1;
+
+    // First bad
+    if ((pcaddr == 0x8019fd0c) && (r4300_cp0_regs(cp0)[CP0_COUNT_REG] == 0x0ff8a802))
+        allow_print = 0;
+
+    if (!(force || allow_print)) return;
+    
+    int i;
+    fprintf(stdout, "ds: %d\n", r4300->delay_slot);
+    fprintf(stdout, "pcaddr: 0x%08x\n", pcaddr);
+    fprintf(stdout, "fcr0: 0x%08x\n", *r4300_cp1_fcr0(cp1));
+    fprintf(stdout, "fcr31: 0x%08x\n", *r4300_cp1_fcr31(cp1));
+    fprintf(stdout, "hi: 0x%llx\n", *r4300_mult_hi(r4300));
+    fprintf(stdout, "lo: 0x%llx\n", *r4300_mult_lo(r4300));
+    fprintf(stdout, "regs: 0x%08x\n", r64_checksum(r4300_regs(r4300)));
+    fprintf(stdout, "cop0: 0x%08x\n", r32_checksum((int*)r4300_cp0_regs(cp0)));
+    fprintf(stdout, "cop1_simple: 0x%08x\n", r64_checksum((int64_t*)*r4300_cp1_regs_simple(cp1)));
+    fprintf(stdout, "cop1_double: 0x%08x\n", r64_checksum((int64_t*)*r4300_cp1_regs_double(cp1)));
+    //fprintf(stdout,"rdram: 0x%08x\n", rdram_checksum(0));
+    fprintf(stdout, "\n");
+    
+    //if(0)
+    {
+        for (i = 0; i < 32; i++)
+            fprintf(stdout, "regs[%d]:0x%016llx\n", i, r4300_regs(r4300)[i]);
+    
+        fprintf(stdout, "\n");
+    
+        for (i = 0; i < 32; i++)
+            fprintf(stdout, "cop0[%s]:0x%08x\n", cop0name[i], r4300_cp0_regs(cp0)[i]);
+        
+        fprintf(stdout, "\n");
+        
+        for (i = 0; i < 32; i++)
+            fprintf(stdout, "cop1_simple[%d]:%lf\n", i, *r4300_cp1_regs_simple(cp1)[i]);
+        
+        fprintf(stdout, "\n");
+        
+        for (i = 0; i < 32; i++)
+            fprintf(stdout, "cop1_double[%d]:%lf\n", i, *r4300_cp1_regs_double(cp1)[i]);
+        
+        fprintf(stdout, "\n");
+    }
+    fflush(stdout);
 }

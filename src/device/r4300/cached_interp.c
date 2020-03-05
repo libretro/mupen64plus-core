@@ -64,10 +64,11 @@
 #endif
 #define DECLARE_INSTRUCTION(name) void cached_interp_##name(void)
 
-#define DECLARE_JUMP(name, destination, condition, link, likely, cop1) \
+#define DECLARE_JUMP(name, destination, condition, link, likely, cop1, print) \
 void cached_interp_##name(void) \
 { \
     DECLARE_R4300 \
+    print \
     const int take_jump = (condition); \
     const uint32_t jump_target = (destination); \
     int64_t *link_register = (link); \
@@ -820,6 +821,11 @@ void cached_interp_recompile_block(struct r4300_core* r4300, const uint32_t* iw,
     for (i = (func & 0xFFF) / 4, finished = 0; finished != 2; ++i)
     {
         inst = block->block + i;
+
+        /* TOREMOVE */
+        /*uint32_t pcaddr = get_instruction_addr(r4300, inst);
+        if (pcaddr == 0x80327ea4)
+            pcaddr = 0;*/
 
 		if (inst->ops != cached_interp_NOTCOMPILED)
 		{

@@ -43,9 +43,10 @@ static void InterpretOpcode(struct r4300_core* r4300);
 #define PCADDR r4300->pcaddr
 #define ADD_TO_PC(x) r4300->pcaddr += x*4;
 #define DECLARE_INSTRUCTION(name) static void name(struct r4300_core* r4300, uint32_t op)
-#define DECLARE_JUMP(name, destination, condition, link, likely, cop1) \
+#define DECLARE_JUMP(name, destination, condition, link, likely, cop1, print) \
    static void name(struct r4300_core* r4300, uint32_t op) \
    { \
+      print; \
       const int take_jump = (condition); \
       const uint32_t jump_target = (destination); \
       int64_t *link_register = (link); \

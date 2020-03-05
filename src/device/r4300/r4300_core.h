@@ -245,5 +245,6 @@ void invalidate_r4300_cached_code(struct r4300_core* r4300, uint32_t address, si
 void generic_jump_to(struct r4300_core* r4300, unsigned int address);
 
 void savestates_load_set_pc(struct r4300_core* r4300, uint32_t pc);
+void print_state(struct r4300_core* r4300, int force);
 
 #endif

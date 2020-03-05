@@ -502,6 +502,7 @@ static void call_interrupt_handler(const struct cp0* cp0, size_t index)
 
 void gen_interrupt(struct r4300_core* r4300)
 {
+    print_state(r4300, 1);
     uint32_t* cp0_regs = r4300_cp0_regs(&r4300->cp0);
     unsigned int* cp0_next_interrupt = r4300_cp0_next_interrupt(&r4300->cp0);
     int* cp0_cycle_count = r4300_cp0_cycle_count(&r4300->cp0);
