@@ -111,7 +111,7 @@ void passe2(struct r4300_core* r4300, struct precomp_instr *dest, int start, int
      */
     for (i = 0; i < r4300->recomp.jumps_number; i++)
     {
-        struct precomp_instr *jump_instr = dest;
+        struct precomp_instr* jump_instr = r4300->recomp.jumps_table[i].mi_addr;
         unsigned int   jmp_offset_loc = r4300->recomp.jumps_table[i].pc_addr;
         unsigned char *addr_dest = NULL;
         /* calculate the destination address to jump to */

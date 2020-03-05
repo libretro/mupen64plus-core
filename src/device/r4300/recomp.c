@@ -640,17 +640,17 @@ void dynarec_recompile_block(struct r4300_core* r4300, const uint32_t* iw, struc
 
     for (i = (func & 0xFFF) / 4, finished = 0; finished != 2; ++i)
     {
+        if ((block->block + i)->ops != dynarec_notcompiled)
+        {
+            finished = 2;
+            continue;
+        }
+
         r4300->recomp.SRC = iw + i;
         r4300->recomp.src = iw[i];
         r4300->recomp.dst = block->block + i;
         r4300->recomp.dst->reg_cache_infos.need_map = 0;
         r4300->recomp.dst->local_addr = r4300->recomp.code_length;
-
-        if (r4300->recomp.dst->ops != dynarec_notcompiled)
-        {
-            finished = 2;
-            continue;
-        }
 
 #ifdef COMPARE_CORE
         gendebug(r4300);
