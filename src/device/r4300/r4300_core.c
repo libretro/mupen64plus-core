@@ -123,12 +123,32 @@ LONG WINAPI ExceptionHandler(struct _EXCEPTION_POINTERS *ExceptionInfo)
 {
 	if (ExceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION)
 	{
+        uintptr_t fault_addr = ExceptionInfo->ExceptionRecord->ExceptionInformation[1];
+
+        if ((fault_addr < (uintptr_t)g_dev.r4300.mem->base)
+            || (fault_addr >= (uintptr_t)g_dev.r4300.mem->base + 0x20000000))
+            return EXCEPTION_EXECUTE_HANDLER;
+
 		// TODO: fix non full mem base
-		uint32_t offset = (uint32_t)((uintptr_t)ExceptionInfo->ExceptionRecord->ExceptionInformation[0x00000001] - (uintptr_t)g_dev.r4300.mem->base);
+		uint32_t offset = (uint32_t)(fault_addr - (uintptr_t)g_dev.r4300.mem->base);
 		offset &= ~0xfff; // page aligned
 
 		invalidate_r4300_cached_code(&g_dev.r4300, (0x80000000 + offset), 0x1000);
 		invalidate_r4300_cached_code(&g_dev.r4300, (0xa0000000 + offset), 0x1000);
+
+        /*TODO: handle r/w to framebuffer according to exception flags
+
+                read exception:  Notify GFX that a protected page is currently being read.
+                                 GFX should update the page with framebuffer content before continuing execution.
+
+                write exception: Notify GFX that a protected page has been written.
+                                 Continue execution.
+                                 GFX should update the framebuffer content with data from dirty pages on next DoRspCycles*/
+                                 
+#define READ_FLAG 0
+#define WRITE_FLAG 1
+        int rw = ExceptionInfo->ExceptionRecord->ExceptionInformation[0];
+        // TODO: FBInfo
 
 		return EXCEPTION_CONTINUE_EXECUTION;
 	}
@@ -542,12 +562,12 @@ void print_state(struct r4300_core* r4300, int force)
     }
 
     // Last good
-    if ((pcaddr == 0x8031b0ac) && (r4300_cp0_regs(cp0)[CP0_COUNT_REG] == 0x0ff69ca0))
-        allow_print = 1;
+    /*if ((pcaddr == 0x8031b0ac) && (r4300_cp0_regs(cp0)[CP0_COUNT_REG] == 0x0ff69ca0))
+        allow_print = 1;*/
 
     // First bad
-    if ((pcaddr == 0x8019fd0c) && (r4300_cp0_regs(cp0)[CP0_COUNT_REG] == 0x0ff8a802))
-        allow_print = 0;
+    /*if ((pcaddr == 0x8019fd0c) && (r4300_cp0_regs(cp0)[CP0_COUNT_REG] == 0x0ff8a802))
+        allow_print = 0;*/
 
     if (!(force || allow_print)) return;
     
