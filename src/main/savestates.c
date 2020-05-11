@@ -25,6 +25,8 @@
 #ifdef USE_SDL
 #include <SDL.h>
 #include <SDL_thread.h>
+#else
+#include <pthread.h>
 #endif
 #include <stddef.h>
 #include <stdint.h>
@@ -65,6 +67,9 @@ static const unsigned char pj64_magic[4] = { 0xC8, 0xA6, 0xD8, 0x23 };
 
 static savestates_job job = savestates_job_nothing;
 static savestates_type type = savestates_type_unknown;
+
+// Libretro will re-use fname for the ptr
+// This avoids ifdef shenanigans
 static char *fname = NULL;
 
 static unsigned int slot = 0;
@@ -72,6 +77,8 @@ static int autoinc_save_slot = 0;
 
 #ifdef USE_SDL
 static SDL_mutex *savestates_lock;
+#else
+static pthread_mutex_t savestates_lock;
 #endif
 
 struct savestate_work {
@@ -158,16 +165,23 @@ savestates_job savestates_get_job(void)
 
 void savestates_set_job(savestates_job j, savestates_type t, const char *fn)
 {
+#ifndef __LIBRETRO__
     if (fname != NULL)
     {
         free(fname);
         fname = NULL;
     }
-
+#endif // __LIBRETRO__
     job = j;
     type = t;
+#ifndef __LIBRETRO__
     if (fn != NULL)
         fname = strdup(fn);
+#else
+    pthread_mutex_lock(&savestates_lock);
+    fname = (char*)fn;
+    pthread_mutex_unlock(&savestates_lock);
+#endif // __LIBRETRO__
 }
 
 static void savestates_clear_job(void)
@@ -211,6 +225,8 @@ int savestates_load_m64p(struct device* dev, const void *data)
 
 #ifdef USE_SDL
     SDL_LockMutex(savestates_lock);
+#else
+    pthread_mutex_lock(&savestates_lock);
 #endif
 
 #ifndef __LIBRETRO__
@@ -270,6 +286,8 @@ int savestates_load_m64p(struct device* dev, const void *data)
 #endif
 #ifdef USE_SDL
         SDL_UnlockMutex(savestates_lock);
+#else
+        pthread_mutex_unlock(&savestates_lock);
 #endif
         return 0;
     }
@@ -282,6 +300,8 @@ int savestates_load_m64p(struct device* dev, const void *data)
 #endif
 #ifdef USE_SDL
         SDL_UnlockMutex(savestates_lock);
+#else
+        pthread_mutex_unlock(&savestates_lock);
 #endif
         return 0;
     }
@@ -298,6 +318,8 @@ int savestates_load_m64p(struct device* dev, const void *data)
 #endif
 #ifdef USE_SDL
         SDL_UnlockMutex(savestates_lock);
+#else
+        pthread_mutex_unlock(&savestates_lock);
 #endif
         return 0;
     }
@@ -370,6 +392,8 @@ int savestates_load_m64p(struct device* dev, const void *data)
 #endif
 #ifdef USE_SDL
     SDL_UnlockMutex(savestates_lock);
+#else
+    pthread_mutex_unlock(&savestates_lock);
 #endif
 
     // Parse savestate
@@ -1464,9 +1488,12 @@ static savestates_type savestates_detect_type(char *filepath)
 
 int savestates_load(void)
 {
+    int ret = 0;
+    struct device* dev = &g_dev;
+
+#ifndef __LIBRETRO__
     FILE *fPtr = NULL;
     char *filepath = NULL;
-    int ret = 0;
 
     if (fname == NULL) // For slots, autodetect the savestate type
     {
@@ -1521,8 +1548,6 @@ int savestates_load(void)
 
     if (filepath != NULL)
     {
-        struct device* dev = &g_dev;
-
         switch (type)
         {
             case savestates_type_m64p: ret = savestates_load_m64p(dev, filepath); break;
@@ -1533,6 +1558,15 @@ int savestates_load(void)
         free(filepath);
         filepath = NULL;
     }
+#else
+    if(fname)
+    {
+        ret = savestates_load_m64p(dev, fname);
+        fname = NULL;
+    } else {
+        ret = 0;
+    }
+#endif // __LIBRETRO__
 
     // deliver callback to indicate completion of state loading operation
     StateChanged(M64CORE_STATE_LOADCOMPLETE, ret);
@@ -1548,6 +1582,8 @@ static void savestates_save_m64p_work(struct work_struct *work)
 
 #ifdef USE_SDL
     SDL_LockMutex(savestates_lock);
+#else
+    pthread_mutex_lock(&savestates_lock);
 #endif
 
 #ifndef __LIBRETRO__
@@ -1585,6 +1621,8 @@ static void savestates_save_m64p_work(struct work_struct *work)
 
 #ifdef USE_SDL
     SDL_UnlockMutex(savestates_lock);
+#else
+    pthread_mutex_unlock(&savestates_lock);
 #endif
 }
 
@@ -2231,9 +2269,11 @@ static int savestates_save_pj64_unc(const struct device* dev, char *filepath)
 
 int savestates_save(void)
 {
-    char *filepath;
     int ret = 0;
     const struct device* dev = &g_dev;
+
+#ifndef __LIBRETRO__
+    char *filepath;
 
     /* Can only save PJ64 savestates on VI / COMPARE interrupt.
        Otherwise try again in a little while. */
@@ -2259,11 +2299,21 @@ int savestates_save(void)
         }
         free(filepath);
     }
+#else
+    if(fname)
+    {
+        ret = savestates_save_m64p(dev, fname);
+        fname = NULL;
+    } else {
+        ret = 0;
+    }
+#endif // __LIBRETRO__
 
     // deliver callback to indicate completion of state saving operation
     StateChanged(M64CORE_STATE_SAVECOMPLETE, ret);
 
     savestates_clear_job();
+
     return ret;
 }
 
