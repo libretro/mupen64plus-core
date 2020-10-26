@@ -43,6 +43,7 @@
 #include "main/version.h"
 #include "main/cheat.h"
 #include "main/workqueue.h"
+#include "main/netplay.h"
 #include "plugin/plugin.h"
 #include "vidext.h"
 
@@ -60,7 +61,7 @@ EXPORT m64p_error CALL CoreStartup(int APIVersion, const char *ConfigPath, const
         return M64ERR_ALREADY_INIT;
 
     /* check wether the caller has already initialized SDL */
-    l_CallerUsingSDL = (SDL_WasInit(0) != 0);
+    l_CallerUsingSDL = 1; //(SDL_WasInit(0) != 0);
 
     /* very first thing is to set the callback functions for debug info and state changing*/
     SetDebugCallback(DebugCallback, Context);
@@ -78,7 +79,8 @@ EXPORT m64p_error CALL CoreStartup(int APIVersion, const char *ConfigPath, const
     g_mem_base = init_mem_base();
     if (g_mem_base == NULL) {
         return M64ERR_NO_MEMORY;
-    } 
+    }
+
     /* The ROM database contains MD5 hashes, goodnames, and some game-specific parameters */
     romdatabase_open();
 
