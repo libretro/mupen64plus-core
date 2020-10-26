@@ -1132,11 +1132,11 @@ extern input_plugin_functions dummy_input;
 extern audio_plugin_functions dummy_audio;
 
 unsigned int r4300_emumode;
+size_t rdram_size;
 
 m64p_error main_run(void)
 {
     size_t i, k;
-    size_t rdram_size;
     uint32_t count_per_op;
     uint32_t emumode;
     uint32_t disable_extra_mem;
@@ -1160,7 +1160,7 @@ m64p_error main_run(void)
     const struct video_capture_backend_interface* igbcam_backend;
 
     /* XXX: select type of flashram from db */
-    uint32_t flashram_type = MX29L1100_ID
+    uint32_t flashram_type = MX29L1100_ID;
     
     randomize_interrupt = 0; // We don't want this right now
     count_per_op = CountPerOp;
