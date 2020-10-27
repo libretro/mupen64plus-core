@@ -27,10 +27,17 @@
 #include "backends/plugins_compat/plugins_compat.h"
 #include "netplay.h"
 
-#include <SDL_net.h>
+#include <mupen64plus-next_common.h>
+
+#include <SDL2/SDL_net.h>
 #if !defined(WIN32)
 #include <sys/socket.h>
+#ifndef HAVE_LIBNX
 #include <netinet/ip.h>
+#else
+#include <switch.h>
+#include <netinet/in.h>
+#endif // HAVE_LIBNX
 #endif
 
 static int l_canFF;
@@ -75,14 +82,14 @@ m64p_error netplay_start(const char* host, int port)
 {
     if (SDLNet_Init() < 0)
     {
-        DebugMessage(M64MSG_ERROR, "Netplay: Could not initialize SDL Net library");
+        log_cb(RETRO_LOG_INFO, "Netplay: Could not initialize SDL Net library\n");
         return M64ERR_SYSTEM_FAIL;
     }
 
     l_udpSocket = SDLNet_UDP_Open(0);
     if (l_udpSocket == NULL)
     {
-        DebugMessage(M64MSG_ERROR, "Netplay: UDP socket creation failed");
+        log_cb(RETRO_LOG_INFO, "Netplay: UDP socket creation failed\n");
         return M64ERR_SYSTEM_FAIL;
     }
 
@@ -98,7 +105,7 @@ m64p_error netplay_start(const char* host, int port)
     l_udpChannel = SDLNet_UDP_Bind(l_udpSocket, -1, &dest);
     if (l_udpChannel < 0)
     {
-        DebugMessage(M64MSG_ERROR, "Netplay: could not bind to UDP socket");
+        log_cb(RETRO_LOG_INFO, "Netplay: could not bind to UDP socket\n");
         SDLNet_UDP_Close(l_udpSocket);
         l_udpSocket = NULL;
         return M64ERR_SYSTEM_FAIL;
@@ -107,7 +114,7 @@ m64p_error netplay_start(const char* host, int port)
     l_tcpSocket = SDLNet_TCP_Open(&dest);
     if (l_tcpSocket == NULL)
     {
-        DebugMessage(M64MSG_ERROR, "Netplay: could not bind to TCP socket");
+        log_cb(RETRO_LOG_INFO, "Netplay: could not bind to TCP socket\n");
         SDLNet_UDP_Close(l_udpSocket);
         l_udpSocket = NULL;
         return M64ERR_SYSTEM_FAIL;
@@ -254,11 +261,11 @@ static void netplay_process()
                 if (current_status != l_status)
                 {
                     if (((current_status & 0x1) ^ (l_status & 0x1)) != 0)
-                        DebugMessage(M64MSG_ERROR, "Netplay: players have de-synced at VI %u", l_vi_counter);
+                        log_cb(RETRO_LOG_INFO, "Netplay: players have de-synced at VI %u\n", l_vi_counter);
                     for (int dis = 1; dis < 5; ++dis)
                     {
                         if (((current_status & (0x1 << dis)) ^ (l_status & (0x1 << dis))) != 0)
-                            DebugMessage(M64MSG_ERROR, "Netplay: player %u has disconnected", dis);
+                            log_cb(RETRO_LOG_INFO, "Netplay: player %u has disconnected\n", dis);
                     }
                     l_status = current_status;
                 }
@@ -291,7 +298,7 @@ static void netplay_process()
                 }
                 break;
             default:
-                DebugMessage(M64MSG_ERROR, "Netplay: received unknown message from server");
+                log_cb(RETRO_LOG_INFO, "Netplay: received unknown message from server\n");
                 break;
         }
     }
@@ -372,7 +379,7 @@ static uint32_t netplay_get_input(uint8_t control_id)
     }
     else
     {
-        DebugMessage(M64MSG_ERROR, "Netplay: lost connection to server");
+        log_cb(RETRO_LOG_INFO, "Netplay: lost connection to server\n");
         main_core_state_set(M64CORE_EMU_STATE, M64EMU_STOPPED);
         keys = 0;
     }
