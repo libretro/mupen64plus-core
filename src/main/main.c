@@ -1006,7 +1006,7 @@ static void init_gb_rom(void* opaque, void** storage, const struct storage_backe
 
     /* Ask the core loader for rom filename */
     char* rom_filename = (g_media_loader.get_gb_cart_rom == NULL)
-        ? NULL
+        ? retro_transferpak_rom_path
         : g_media_loader.get_gb_cart_rom(g_media_loader.cb_data, data->control_id);
 
     /* Handle the no cart case */
@@ -1016,11 +1016,11 @@ static void init_gb_rom(void* opaque, void** storage, const struct storage_backe
 
     /* Open ROM file */
     if (open_rom_file_storage(&data->rom_fstorage, rom_filename) != file_ok) {
-        DebugMessage(M64MSG_ERROR, "Failed to load ROM file: %s", rom_filename);
+        log_cb(RETRO_LOG_ERROR, "Failed to load ROM file: %s\n", rom_filename);
         goto no_cart;
     }
 
-    DebugMessage(M64MSG_INFO, "GB Loader ROM: %s - %zu",
+    log_cb(RETRO_LOG_INFO, "GB Loader ROM: %s - %zu\n",
             data->rom_fstorage.filename,
             data->rom_fstorage.size);
 
@@ -1050,7 +1050,7 @@ static void init_gb_ram(void* opaque, size_t ram_size, void** storage, const str
 
     /* Ask the core loader for ram filename */
     char* ram_filename = (g_media_loader.get_gb_cart_ram == NULL)
-        ? NULL
+        ? retro_transferpak_ram_path
         : g_media_loader.get_gb_cart_ram(g_media_loader.cb_data, data->control_id);
 
     /* Handle the no RAM case
@@ -1066,13 +1066,13 @@ static void init_gb_ram(void* opaque, size_t ram_size, void** storage, const str
     int err = open_file_storage(&data->ram_fstorage, ram_size, ram_filename);
     if (err == file_open_error) {
         memset(data->ram_fstorage.data, 0, data->ram_fstorage.size);
-        DebugMessage(M64MSG_INFO, "Providing default RAM content");
+        log_cb(RETRO_LOG_INFO, "Providing default RAM content\n");
     }
     else if (err == file_read_error) {
-        DebugMessage(M64MSG_WARNING, "Size mismatch between expected RAM size and effective file size");
+        log_cb(RETRO_LOG_WARN, "Size mismatch between expected RAM size and effective file size\n");
     }
 
-    DebugMessage(M64MSG_INFO, "GB Loader RAM: %s - %zu",
+    log_cb(RETRO_LOG_INFO, "GB Loader RAM: %s - %zu\n",
             data->ram_fstorage.filename,
             data->ram_fstorage.size);
 
@@ -1115,10 +1115,10 @@ void main_change_gb_cart(int control_id)
 
     if (tpk->gb_cart != NULL) {
         const uint8_t* rom_data = gb_cart->irom_storage->data(gb_cart->rom_storage);
-        DebugMessage(M64MSG_INFO, "Inserting GB cart %s into transferpak %u", rom_data + 0x134, control_id);
+        log_cb(RETRO_LOG_INFO, "Inserting GB cart %s into transferpak %u\n", rom_data + 0x134, control_id);
     }
     else {
-        DebugMessage(M64MSG_INFO, "Removing GB cart from transferpak %u", control_id);
+        log_cb(RETRO_LOG_WARN, "Removing GB cart from transferpak %u\n", control_id);
     }
 }
 
@@ -1353,7 +1353,7 @@ m64p_error main_run(void)
                     }
 
                     /* enable GB cart switch */
-                    cin_compats[i].gb_cart_switch_enabled = 1;
+                    // cin_compats[i].gb_cart_switch_enabled = 1;
                 }
                 /* No Pak */
                 else {
