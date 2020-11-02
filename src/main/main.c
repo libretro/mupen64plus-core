@@ -795,26 +795,70 @@ void save_storage_file_libretro(void* storage)
 
 static void open_mpk_file(struct file_storage* storage)
 {
-    storage->data = saved_memory.mempack;
-    storage->size = MEMPAK_SIZE * 4;
+    if (!netplay_is_init())
+    {
+        storage->data = saved_memory.mempack;
+        storage->size = MEMPAK_SIZE * 4;
+    }
+    else
+    {
+        // First we save them with what we have
+        storage->data = saved_memory.mempack;
+        storage->size = MEMPAK_SIZE * 4;
+        // If player 1 we send, otherwise we recieve
+        netplay_read_storage("MPK.bin", storage->data, storage->size);
+    }
 }
 
 static void open_fla_file(struct file_storage* storage)
 {
-    storage->data = saved_memory.flashram;
-    storage->size = FLASHRAM_SIZE;
+    if (!netplay_is_init())
+    {
+        storage->data = saved_memory.flashram;
+        storage->size = FLASHRAM_SIZE;
+    }
+    else
+    {
+        // First we save them with what we have
+        storage->data = saved_memory.flashram;
+        storage->size = FLASHRAM_SIZE;
+        // If player 1 we send, otherwise we recieve
+        netplay_read_storage("FLA.bin", storage->data, storage->size);
+    }
 }
 
 static void open_sra_file(struct file_storage* storage)
 {
-    storage->data = saved_memory.sram;
-    storage->size = SRAM_SIZE;
+    if (!netplay_is_init())
+    {
+        storage->data = saved_memory.sram;
+        storage->size = SRAM_SIZE;
+    }
+    else
+    {
+        // First we save them with what we have
+        storage->data = saved_memory.sram;
+        storage->size = SRAM_SIZE;
+        // If player 1 we send, otherwise we recieve
+        netplay_read_storage("SRA.bin", storage->data, storage->size);
+    }
 }
 
 static void open_eep_file(struct file_storage* storage)
 {
-    storage->data = saved_memory.eeprom;
-    storage->size = EEPROM_MAX_SIZE;
+    if (!netplay_is_init())
+    {
+        storage->data = saved_memory.eeprom;
+        storage->size = EEPROM_MAX_SIZE;
+    }
+    else
+    {
+        // First we save them with what we have
+        storage->data = saved_memory.eeprom;
+        storage->size = EEPROM_MAX_SIZE;
+        // If player 1 we send, otherwise we recieve
+        netplay_read_storage("EEP.bin", storage->data, storage->size);
+    }
 }
 
 static void load_dd_rom(uint8_t* rom, size_t* rom_size)

@@ -446,10 +446,7 @@ file_status_t netplay_read_storage(const char *filename, void *data, size_t size
     //This function syncs save games.
     //If the client is controlling player 1, it sends its save game to the server
     //All other players receive save files from the server
-    const char *short_filename = strrchr(filename, '/');
-    if (short_filename == NULL)
-        short_filename = strrchr(filename, '\\');
-    short_filename += 1;
+    const char *short_filename = filename;
 
     uint32_t buffer_pos = 0;
     char *output_data = malloc(size + strlen(short_filename) + 6);
@@ -466,9 +463,10 @@ file_status_t netplay_read_storage(const char *filename, void *data, size_t size
         memcpy(&output_data[buffer_pos], short_filename, strlen(short_filename) + 1);
         buffer_pos += strlen(short_filename) + 1;
 
-        ret = read_from_file(filename, data, size);
-        if (ret == file_open_error)
-            memset(data, 0, size); //all zeros means there is no save file
+        // Not wanted for libretro
+        //ret = read_from_file(filename, data, size);
+        //if (ret == file_open_error)
+        //    memset(data, 0, size); //all zeros means there is no save file
         SDLNet_Write32((int32_t)size, &output_data[buffer_pos]); //file data size
         buffer_pos += 4;
         memcpy(&output_data[buffer_pos], data, size); //file data
