@@ -348,6 +348,8 @@ static void netplay_delete_event(struct netplay_event* current, uint8_t control_
 static uint32_t netplay_get_input(uint8_t control_id)
 {
     uint32_t keys;
+    struct retro_fastforwarding_override ff_override;
+
     netplay_process();
     netplay_request_input(control_id);
 
@@ -358,10 +360,23 @@ static uint32_t netplay_get_input(uint8_t control_id)
     {
         l_canFF = 1;
         main_core_state_set(M64CORE_SPEED_LIMITER, 0);
+
+        // Enable Fast Forward
+        ff_override.fastforward = true;
+        // Prevent user toggling Fast Forward
+        ff_override.inhibit_toggle = true;
+        environ_cb(RETRO_ENVIRONMENT_SET_FASTFORWARDING_OVERRIDE, &ff_override);
     }
     else
     {
         main_core_state_set(M64CORE_SPEED_LIMITER, 1);
+        
+        // Disable Fast Forward
+        ff_override.fastforward = false;
+        // Prevent user toggling Fast Forward
+        ff_override.inhibit_toggle = true;
+        environ_cb(RETRO_ENVIRONMENT_SET_FASTFORWARDING_OVERRIDE, &ff_override);
+
         l_canFF = 0;
     }
 

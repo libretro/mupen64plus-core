@@ -621,6 +621,8 @@ void new_frame(void)
     }
 }
 
+/*
+#define SAMPLE_COUNT 1
 static void apply_speed_limiter(void)
 {
     static unsigned long totalVIs = 0;
@@ -707,6 +709,7 @@ static void apply_speed_limiter(void)
     timed_section_end(TIMED_SECTION_IDLE);
 #endif
 }
+*/
 
 /* TODO: make a GameShark module and move that there */
 static void gs_apply_cheats(struct cheat_ctx* ctx)
@@ -746,7 +749,7 @@ void new_vi(void)
 
     gs_apply_cheats(&g_cheat_ctx);
 
-    apply_speed_limiter();
+    // apply_speed_limiter();
     main_check_inputs();
 
     netplay_check_sync(&g_dev.r4300.cp0);
