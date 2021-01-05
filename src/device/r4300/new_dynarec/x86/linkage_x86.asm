@@ -52,18 +52,12 @@ section .note.GNU-stack noalloc noexec nowrite progbits
       call  %%getgot
   %%getgot:
       pop  ebx
-      add  ebx,_GLOBAL_OFFSET_TABLE_+$$-%%getgot wrt ..gotpc
+      sub ebx, %%getgot
 %endmacro
 
-%ifdef PIC
-    %define get_got_address get_GOT
-    %define find_local_data(a) ebx + a wrt ..gotoff
-    %define find_external_data(a) ebx + a wrt ..got
-%else
-    %define get_got_address
-    %define find_local_data(a) a
-    %define find_extern_data(a) a
-%endif
+%define get_got_address get_GOT
+%define find_local_data(a) ebx + a
+%define find_external_data(a) ebx + a
 
 %define g_dev_r4300_new_dynarec_hot_state_stop              (g_dev + offsetof_struct_device_r4300 + offsetof_struct_r4300_core_new_dynarec_hot_state + offsetof_struct_new_dynarec_hot_state_stop)
 %define g_dev_r4300_new_dynarec_hot_state_cycle_count       (g_dev + offsetof_struct_device_r4300 + offsetof_struct_r4300_core_new_dynarec_hot_state + offsetof_struct_new_dynarec_hot_state_cycle_count)
@@ -109,10 +103,6 @@ cextern cop1_unusable
 cextern SYSCALL_new
 cextern dynamic_linker
 cextern dynamic_linker_ds
-
-%ifdef PIC
-cextern _GLOBAL_OFFSET_TABLE_
-%endif
 
 section .bss
 align 4
