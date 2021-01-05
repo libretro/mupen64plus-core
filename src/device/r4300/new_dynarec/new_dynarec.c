@@ -95,6 +95,8 @@ void recomp_dbg_block(int addr);
     #define assem_debug(...) DebugMessage(M64MSG_VERBOSE, __VA_ARGS__)
 #else
     #define assem_debug(...)
+    // Cleanup debug copies
+    #define strcpy(...)
 #endif
 #if INV_DEBUG
     #define inv_debug(...) DebugMessage(M64MSG_VERBOSE, __VA_ARGS__)
