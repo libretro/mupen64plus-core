@@ -78,8 +78,11 @@
 #include <libretro_private.h>
 #include <libco.h>
 
+#ifdef M64P_NETPLAY
 #undef SDL_GetTicks
 #include <SDL2/SDL.h>
+#endif // M64P_NETPLAY
+
 #ifdef HAVE_LIBNX
 #include <switch.h>
 #include <sys/stat.h>
