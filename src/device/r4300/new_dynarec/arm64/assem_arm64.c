@@ -297,6 +297,9 @@ static void set_jump_target(intptr_t addr,uintptr_t target)
   u_int *ptr=(u_int *)addr;
   intptr_t offset=target-(intptr_t)addr;
 
+  if(!ptr) // Indiana Jones is weird
+    return;
+
   if((*ptr&0xFC000000)==0x14000000) {
     assert(offset>=-134217728LL&&offset<134217728LL);
     *ptr=(*ptr&0xFC000000)|((offset>>2)&0x3ffffff);
@@ -2920,7 +2923,7 @@ static void emit_adr(intptr_t addr, int rt)
 
   intptr_t offset=addr-(intptr_t)out_rx;
   assert(offset>=-1048576LL&&offset<1048576LL);
-  assem_debug("adr %d,#%d",regname64[rt],offset);
+  assem_debug("adr %s,#%d",regname64[rt],offset);
   output_w32(0x10000000|(offset&0x3)<<29|((offset>>2)&0x7ffff)<<5|rt);
 }
 static void emit_adrp(intptr_t addr, int rt)
@@ -2933,7 +2936,7 @@ static void emit_adrp(intptr_t addr, int rt)
   assert(offset>=-4294967296LL&&offset<4294967296LL);
   offset>>=12;
   assert((((intptr_t)out_rx&~0xfffLL)+(offset<<12))==(addr&~0xfffLL));
-  assem_debug("adrp %d,#%d",regname64[rt],offset);
+  assem_debug("adrp %s,#%d",regname64[rt],offset);
   output_w32(0x90000000|(offset&0x3)<<29|((offset>>2)&0x7ffff)<<5|rt);
 }
 static void emit_pc_relative_addr(intptr_t addr, int rt)
@@ -5009,7 +5012,8 @@ static void multdiv_assemble_arm64(int i,struct regstat *i_regs)
         assert(r1l>=0);
         assert(r2l>=0);
 
-        for(int hr=0;hr<HOST_REGS;hr++) {
+        int hr;
+        for(hr=0;hr<HOST_REGS;hr++) {
           if(i_regs->regmap[hr]>=0) reglist|=1<<hr;
         }
 
@@ -5179,4 +5183,6 @@ static void arch_init(void) {
     ptr2++;
     ptr3+=2;
   }
+
+  __clear_cache((char *)base_addr+(1<<TARGET_SIZE_2)-JUMP_TABLE_SIZE,(char *)base_addr+(1<<TARGET_SIZE_2));
 }

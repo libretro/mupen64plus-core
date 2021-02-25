@@ -45,7 +45,11 @@
 #include "device/rcp/rsp/rsp_core.h"
 
 #if !defined(WIN32)
+#ifndef HAVE_LIBNX
 #include <sys/mman.h>
+#else
+#include "../../../../../switch/mman.h"
+#endif // HAVE_LIBNX
 #endif
 
 #if defined(RECOMPILER_DEBUG) && !defined(RECOMP_DBG)
@@ -1759,7 +1763,9 @@ static void tlb_speed_hacks()
 u_int verify_dirty(struct ll_entry * head)
 {
   void *source;
-  if((int)head->start>=0xa4000000&&(int)head->start<0xa4001000) {
+  if((int)head->start>=0xA0000000&&(int)head->start<0xA07FFFFF) {
+    source=(void *)((uintptr_t)g_dev.rdram.dram+head->start-0xA0000000);
+  }else if((int)head->start>=0xa4000000&&(int)head->start<0xa4001000) {
     source=(void *)((uintptr_t)g_dev.sp.mem+head->start-0xa4000000);
   }else if((int)head->start>=0x80000000&&(int)head->start<0x80800000) {
     source=(void *)((uintptr_t)g_dev.rdram.dram+head->start-(uintptr_t)0x80000000);
@@ -1814,6 +1820,7 @@ static void ll_remove_matching_addrs(struct ll_entry **head,intptr_t addr,int sh
 {
   struct ll_entry **cur=head;
   struct ll_entry *next;
+
   while(*cur) {
     if((((uintptr_t)((*cur)->addr)-(uintptr_t)base_addr)>>shift)==((addr-(uintptr_t)base_addr)>>shift) ||
        (((uintptr_t)((*cur)->addr)-(uintptr_t)base_addr-MAX_OUTPUT_BLOCK_SIZE)>>shift)==((addr-(uintptr_t)base_addr)>>shift))
@@ -1947,6 +1954,7 @@ static struct ll_entry *get_dirty(struct r4300_core* r4300,u_int vaddr,u_int fla
     }
     head=head->next;
   }
+  
   return NULL;
 }
 
@@ -2094,7 +2102,6 @@ void *get_addr(u_int vaddr)
     }
     return (void*)(((intptr_t)head->clean_addr-(intptr_t)base_addr)+(intptr_t)base_addr_rx);
   }
-
   int r=new_recompile_block(vaddr);
   if(r==0) return get_addr(vaddr);
   // Execute in unmapped page, generate pagefault execption
@@ -2145,7 +2152,6 @@ void *get_addr_32(u_int vaddr,u_int flags)
      }
     return (void*)(((intptr_t)head->clean_addr-(intptr_t)base_addr)+(intptr_t)base_addr_rx);
   }
-
   int r=new_recompile_block(vaddr);
   if(r==0) return get_addr(vaddr);
   // Execute in unmapped page, generate pagefault execption
@@ -7514,6 +7520,9 @@ static void disassemble_inst(int i)
     }
 }
 
+#ifdef HAVE_LIBNX
+ALIGN(4096, char jit_memory[33554432]) __attribute__((section(".text")));
+#endif
 void new_dynarec_init(void)
 {
   DebugMessage(M64MSG_INFO, "Init new dynarec");
@@ -7530,9 +7539,17 @@ void new_dynarec_init(void)
 #define DOUBLE_CACHE_ADDR 3   // Put the dynarec cache at random address with RW address != RX address
 
 // Default to fixed cache address
+#ifdef HAVE_LIBNX
+#define CACHE_ADDR DOUBLE_CACHE_ADDR
+#else
 #define CACHE_ADDR FIXED_CACHE_ADDR
+#endif
 
 #if CACHE_ADDR==DOUBLE_CACHE_ADDR
+#ifdef HAVE_LIBNX
+  base_addr = mmap((u_char *)jit_memory, 1<<TARGET_SIZE_2, 0,0,0,0);
+  base_addr_rx = (void*)jit_memory;
+#else
   #include <unistd.h>
   #include <sys/types.h>
   #include <fcntl.h>
@@ -7553,6 +7570,7 @@ void new_dynarec_init(void)
 
   assert(base_addr_rx!=(void*)-1);
   close(fd);
+#endif // HAVE_LIBNX
 #elif CACHE_ADDR==FIXED_CACHE_ADDR
   base_addr = mmap ((u_char *)g_dev.r4300.extra_memory, 1<<TARGET_SIZE_2,
                     PROT_READ | PROT_WRITE | PROT_EXEC,
@@ -7612,7 +7630,11 @@ void new_dynarec_init(void)
   // Copy this into local area so we don't have to put it in every literal pool
   g_dev.r4300.new_dynarec_hot_state.invc_ptr=g_dev.r4300.cached_interp.invalid_code;
 #endif
+#ifdef HAVE_LIBNX
   stop_after_jal=0;
+#else
+  stop_after_jal=1;
+#endif
   // TLB
   using_tlb=0;
   for(n=0;n<524288;n++) // 0 .. 0x7FFFFFFF
@@ -7662,7 +7684,11 @@ int new_recompile_block(int addr)
 #endif
   start = (u_int)addr&~3;
   //assert(((u_int)addr&1)==0);
-  if ((int)addr >= 0xa4000000 && (int)addr < 0xa4001000) {
+  if ((int)addr >= 0xA0000000 && (int)addr < 0xA07FFFFF) {
+    source = (u_int *)((uintptr_t)g_dev.rdram.dram+start-0xA0000000);
+    pagelimit = 0xA07FFFFF;
+  }
+  else if ((int)addr >= 0xa4000000 && (int)addr < 0xa4001000) {
     source = (u_int *)((uintptr_t)g_dev.sp.mem+start-0xa4000000);
     pagelimit = 0xa4001000;
   }
@@ -10955,6 +10981,9 @@ int new_recompile_block(int addr)
     }
     expirep=(expirep+1)&65535;
   }
+
+  //recompile_end
+  
   return 0;
 }
 

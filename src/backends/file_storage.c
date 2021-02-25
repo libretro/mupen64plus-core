@@ -30,6 +30,8 @@
 #include "main/util.h"
 #include "main/netplay.h"
 
+#include <mupen64plus-next_common.h>
+
 int open_file_storage(struct file_storage* fstorage, size_t size, const char* filename)
 {
     /* ! Take ownership of filename ! */
@@ -90,18 +92,20 @@ static size_t file_storage_size(const void* storage)
 
 static void file_storage_save(void* storage)
 {
-    if (netplay_is_init() && netplay_get_controller(0) == -1)
-        return;
-
+    //TODO: Fix storage
+    //if (netplay_is_init() && netplay_get_controller(0) == -1)
+    //    return;
+    return;
+    
     struct file_storage* fstorage = (struct file_storage*)storage;
 
     switch(write_to_file(fstorage->filename, fstorage->data, fstorage->size))
     {
     case file_open_error:
-        DebugMessage(M64MSG_WARNING, "couldn't open storage file '%s' for writing", fstorage->filename);
+        log_cb(RETRO_LOG_WARN, "Couldn't open storage file '%s' for writing\n", fstorage->filename);
         break;
     case file_write_error:
-        DebugMessage(M64MSG_WARNING, "failed to write storage file '%s'", fstorage->filename);
+        log_cb(RETRO_LOG_WARN, "Failed to write storage file '%s'\n", fstorage->filename);
         break;
     default:
         break;
@@ -116,6 +120,9 @@ static void file_storage_parent_save(void* storage)
 
 static void file_storage_dd_sdk_dump_save(void* storage)
 {
+    //TODO: Fix storage
+    return;
+    
     static uint8_t sdk_buffer[SDK_FORMAT_DUMP_SIZE];
     struct file_storage* fstorage = (struct file_storage*)storage;
 
