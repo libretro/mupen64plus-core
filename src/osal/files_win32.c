@@ -64,10 +64,8 @@ static int search_dir_file(char *destpath, const char *path, const char *filenam
         strcat(destpath, "\\");
     strcat(destpath, filename);
 
-    wchar_t w_destpath[PATH_MAX];
-    MultiByteToWideChar(CP_UTF8, 0, destpath, -1, w_destpath, PATH_MAX);
     /* test for a valid file */
-    if (_wstat(w_destpath, &fileinfo) != 0)
+    if (_stat(destpath, &fileinfo) != 0)
         return 2;
     if ((fileinfo.st_mode & _S_IFREG) == 0)
         return 3;
@@ -80,48 +78,52 @@ static int search_dir_file(char *destpath, const char *path, const char *filenam
 
 int osal_mkdirp(const char *dirpath, int mode)
 {
-    wchar_t mypath[MAX_PATH];
-    wchar_t *currpath, *lastchar;
+    char *mypath, *currpath, *lastchar;
     struct _stat fileinfo;
 
     // Create a copy of the path, so we can modify it
-    if (MultiByteToWideChar(CP_UTF8, 0, dirpath, -1, mypath, MAX_PATH) == 0)
+    mypath = currpath = _strdup(dirpath);
+    if (mypath == NULL)
         return 1;
-    currpath = &mypath[0];
 
     // if the directory path ends with a separator, remove it
-    lastchar = mypath + wcslen(mypath) - 1;
-    if (wcschr(WIDE_OSAL_DIR_SEPARATORS, *lastchar) != NULL)
+    lastchar = mypath + strlen(mypath) - 1;
+    if (strchr(OSAL_DIR_SEPARATORS, *lastchar) != NULL)
         *lastchar = 0;
 
     // Terminate quickly if the path already exists
-    if (_wstat(mypath, &fileinfo) == 0 && (fileinfo.st_mode & _S_IFDIR))
-        return 0;
+    if (_stat(mypath, &fileinfo) == 0 && (fileinfo.st_mode & _S_IFDIR))
+        goto goodexit;
 
-    while ((currpath = wcspbrk(currpath + 1, WIDE_OSAL_DIR_SEPARATORS)) != NULL)
+    while ((currpath = strpbrk(currpath + 1, OSAL_DIR_SEPARATORS)) != NULL)
     {
         // if slash is right after colon, then we are looking at drive name prefix (C:\) and should
         // just skip it, because _stat and _mkdir will both fail for "C:"
-        if (currpath > mypath && currpath[-1] == L':')
+        if (currpath > mypath && currpath[-1] == ':')
             continue;
-        *currpath = L'\0';
-        if (_wstat(mypath, &fileinfo) != 0)
+        *currpath = '\0';
+        if (_stat(mypath, &fileinfo) != 0)
         {
-            if (_wmkdir(mypath) != 0)
-                return 1;
+            if (_mkdir(mypath) != 0)
+                goto errorexit;
         }
         else if (!(fileinfo.st_mode & _S_IFDIR))
         {
-            return 1;
+            goto errorexit;
         }
-        *currpath = WIDE_OSAL_DIR_SEPARATORS[0];
+        *currpath = OSAL_DIR_SEPARATORS[0];
     }
 
     // Create full path
-    if  (_wmkdir(mypath) != 0)
-       return 1;
+    if  (_mkdir(mypath) != 0)
+        goto errorexit;
 
+goodexit:
+    free(mypath);
     return 0;
+errorexit:
+    free(mypath);
+    return 1;
 }
 
 const char * osal_get_shared_filepath(const char *filename, const char *firstsearch, const char *secondsearch)
@@ -150,8 +152,7 @@ const char * osal_get_shared_filepath(const char *filename, const char *firstsea
 
 const char * osal_get_user_configpath(void)
 {
-    static wchar_t chHomePath[MAX_PATH];
-    static char outString[MAX_PATH];
+    static char chHomePath[MAX_PATH];
     LPITEMIDLIST pidl;
     LPMALLOC pMalloc;
     struct _stat fileinfo;
@@ -159,37 +160,35 @@ const char * osal_get_user_configpath(void)
     // Get item ID list for the path of user's personal directory
     SHGetSpecialFolderLocation(NULL, CSIDL_APPDATA, &pidl);
     // get the path in a char string
-    SHGetPathFromIDListW(pidl, chHomePath);
+    SHGetPathFromIDList(pidl, chHomePath);
     // do a bunch of crap just to free some memory
     SHGetMalloc(&pMalloc);
     pMalloc->lpVtbl->Free(pMalloc, pidl);
     pMalloc->lpVtbl->Release(pMalloc);
 
     // tack on 'mupen64plus'
-    if (chHomePath[wcslen(chHomePath)-1] != L'\\')
-        wcscat(chHomePath, L"\\");
-    wcscat(chHomePath, L"Mupen64Plus");
+    if (chHomePath[strlen(chHomePath)-1] != '\\')
+        strcat(chHomePath, "\\");
+    strcat(chHomePath, "Mupen64Plus");
 
     // if this directory doesn't exist, then make it
-    if (_wstat(chHomePath, &fileinfo) == 0)
+    if (_stat(chHomePath, &fileinfo) == 0)
     {
-        wcscat(chHomePath, L"\\");
-        WideCharToMultiByte(CP_UTF8, 0, chHomePath, -1, outString, MAX_PATH, NULL, NULL);
-        return outString;
+        strcat(chHomePath, "\\");
+        return chHomePath;
     }
     else
     {
-        WideCharToMultiByte(CP_UTF8, 0, chHomePath, -1, outString, MAX_PATH, NULL, NULL);
-        osal_mkdirp(outString, 0);
-        if (_wstat(chHomePath, &fileinfo) == 0)
+        osal_mkdirp(chHomePath, 0);
+        if (_stat(chHomePath, &fileinfo) == 0)
         {
-            strcat(outString, "\\");
-            return outString;
+            strcat(chHomePath, "\\");
+            return chHomePath;
         }
     }
 
     /* otherwise we are in trouble */
-    DebugMessage(M64MSG_ERROR, "Failed to open configuration directory '%ls'.", chHomePath);
+    DebugMessage(M64MSG_ERROR, "Failed to open configuration directory '%s'.", chHomePath);
     return NULL;
 }
 
@@ -205,18 +204,4 @@ const char * osal_get_user_cachepath(void)
     return osal_get_user_configpath();
 }
 
-FILE * osal_file_open ( const char * filename, const char * mode )
-{
-    wchar_t wstr_filename[PATH_MAX];
-    wchar_t wstr_mode[64];
-    MultiByteToWideChar(CP_UTF8, 0, filename, -1, wstr_filename, PATH_MAX);
-    MultiByteToWideChar(CP_UTF8, 0, mode, -1, wstr_mode, 64);
-    return _wfopen (wstr_filename, wstr_mode);
-}
 
-gzFile osal_gzopen(const char *filename, const char *mode)
-{
-    wchar_t wstr_filename[PATH_MAX];
-    MultiByteToWideChar(CP_UTF8, 0, filename, -1, wstr_filename, PATH_MAX);
-    return gzopen_w(wstr_filename, mode);
-}
