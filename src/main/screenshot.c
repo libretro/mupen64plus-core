@@ -97,7 +97,7 @@ static int SaveRGBBufferToFile(const char *filename, const unsigned char *buf, i
         return 3;
     }
     // open the file to write
-    FILE *savefile = osal_file_open(filename, "wb");
+    FILE *savefile = fopen(filename, "wb");
     if (savefile == NULL)
     {
         DebugMessage(M64MSG_ERROR, "Error opening '%s' to save screenshot.", filename);
@@ -189,7 +189,7 @@ static char *GetNextScreenshotPath(void)
     for (; CurrentShotIndex < 1000; CurrentShotIndex++)
     {
         sprintf(NumberPtr, "%03i.png", CurrentShotIndex);
-        FILE *pFile = osal_file_open(ScreenshotPath, "r");
+        FILE *pFile = fopen(ScreenshotPath, "r");
         if (pFile == NULL)
             break;
         fclose(pFile);

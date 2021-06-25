@@ -38,7 +38,6 @@
 #include "device/device.h"
 #include "main.h"
 #include "md5.h"
-#include "osal/files.h"
 #include "osal/preproc.h"
 #include "osd/osd.h"
 #include "rom.h"
@@ -413,7 +412,7 @@ void romdatabase_open(void)
         return;
 
     /* Open romdatabase. */
-    if (pathname == NULL || (fPtr = osal_file_open(pathname, "rb")) == NULL)
+    if (pathname == NULL || (fPtr = fopen(pathname, "rb")) == NULL)
     {
         DebugMessage(M64MSG_ERROR, "Unable to open rom database file '%s'.", pathname);
         return;
