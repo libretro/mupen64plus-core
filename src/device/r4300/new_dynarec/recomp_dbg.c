@@ -835,7 +835,7 @@ void recomp_dbg_init(void)
   cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
 
  #if RECOMPILER_DEBUG >= NEW_DYNAREC_ARM
-  FILE * pFile = osal_file_open ("jump_table.txt","w");
+  FILE * pFile = fopen ("jump_table.txt","w");
   uintptr_t * src = (uintptr_t *)((char *)base_addr+(1<<TARGET_SIZE_2)-JUMP_TABLE_SIZE);
 
   while((char *)src<(char *)base_addr+(1<<TARGET_SIZE_2))
@@ -916,7 +916,7 @@ extern unsigned int using_tlb;
   if((disasm == 0) || (handle == 0)) return;
 
   sprintf(filename, "0x%.8x.txt",addr);
-  pFile = osal_file_open (filename,"w");
+  pFile = fopen (filename,"w");
 
   for(int i=0;i<slen;i++)
     disassemble(i, pFile);
@@ -925,7 +925,7 @@ extern unsigned int using_tlb;
   fclose(pFile);
 
   sprintf(filename, "%s_0x%.8x.txt","debug",addr);
-  pFile = osal_file_open (filename,"w");
+  pFile = fopen (filename,"w");
 
   for(int i=0;i<slen;i++)
     debugging(i, pFile);
@@ -934,7 +934,7 @@ extern unsigned int using_tlb;
   fclose(pFile);
 
   sprintf(filename, "%s_0x%.8x.txt",ARCH_NAME,addr);
-  pFile = osal_file_open (filename,"w");
+  pFile = fopen (filename,"w");
   size = (intptr_t)end - (intptr_t)beginning;
   size = (size < 0) ? (-size) : size;
 

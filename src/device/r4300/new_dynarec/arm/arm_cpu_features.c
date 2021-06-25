@@ -33,8 +33,8 @@ const char procfile[] = "/proc/cpuinfo";
 static unsigned char check_arm_cpu_feature(const char* feature)
 {
     unsigned char status = 0;
-    FILE *pFile = osal_file_open(procfile, "r");
-
+    FILE *pFile = fopen(procfile, "r");
+    
     if (pFile != NULL)
     {
         char line[1024];
@@ -57,8 +57,8 @@ static unsigned char check_arm_cpu_feature(const char* feature)
 static unsigned char get_arm_cpu_implementer(void)
 {
     unsigned char implementer = 0;
-    FILE *pFile = osal_file_open(procfile, "r");
-
+    FILE *pFile = fopen(procfile, "r");
+    
     if (pFile != NULL)
     {
         char line[1024];
@@ -80,8 +80,8 @@ static unsigned char get_arm_cpu_implementer(void)
 static unsigned short get_arm_cpu_part(void)
 {
     unsigned short part = 0;
-    FILE *pFile = osal_file_open(procfile, "r");
-
+    FILE *pFile = fopen(procfile, "r");
+    
     if (pFile != NULL)
     {
         char line[1024];
