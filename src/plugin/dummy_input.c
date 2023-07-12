@@ -47,12 +47,12 @@ m64p_error dummyinput_PluginGetVersion(m64p_plugin_type *PluginType, int *Plugin
     return M64ERR_SUCCESS;
 }
 
-void dummyinput_InitiateControllers (CONTROL_INFO ControlInfo)
+void dummyinput_InitiateControllers(CONTROL_INFO ControlInfo)
 {
     ControlInfo.Controls[0].Present = 1;
 }
 
-void dummyinput_GetKeys(int Control, BUTTONS * Keys )
+void dummyinput_GetKeys(int Control, BUTTONS *Keys)
 {
     Keys->Value = 0x0000;
 }
